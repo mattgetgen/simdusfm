@@ -1,2 +1,2 @@
-# libusfm
-A standard USFM parser library for all systems and architectures
+# simdusfm
+A performance USFM parser for all Operating Systems and Architectures.
