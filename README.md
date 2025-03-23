@@ -1,2 +1,2 @@
 # simdusfm
-A performance USFM parser for all Operating Systems and Architectures.
+A performant USFM parser accesible to all programming languages, operating systems, and architectures.
