@@ -978,6 +978,7 @@ pub const Tokenizer = struct {
                 }
             },
             .search_until_not_text => {
+                // TODO: redo this so that the / marker is handled correctly
                 switch (self.buffer[self.index]) {
                     0, '\\', '~', '/', '\r', '\n' => {
                         break :state;
