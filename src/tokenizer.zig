@@ -11,7 +11,6 @@ pub const Token = struct {
 
     pub const Tag = enum {
         invalid,
-        invalid_marker,
         eof,
         text,
         caller_plus,
@@ -21,6 +20,7 @@ pub const Token = struct {
         /// LINE AND FORMATTING Characters
         tilde,
         line_break,
+        marker_invalid,
         /// IDENTIFICATION  Markers
         marker_id,
         marker_usfm,
@@ -226,11 +226,13 @@ pub const Token = struct {
         marker_jmp_open,
         marker_jmp_close,
         /// MILESTONE Markers
+        marker_qtN,
         marker_qtN_s,
         marker_qtN_e,
+        marker_ts,
         marker_ts_s,
         marker_ts_e,
-        marker_close,
+        marker_milestone_close,
         /// EXTENDED FOOTNOTE Markers
         marker_ef_open,
         marker_ef_close,
@@ -502,10 +504,9 @@ pub const Token = struct {
         .{ "wh", .marker_wh_open },
         .{ "wa", .marker_wa_open },
         .{ "jmp", .marker_jmp_open },
-        .{ "qt", .marker_qtN_s },
-        .{ "ts-s", .marker_ts_s },
-        .{ "ts-e", .marker_ts_e },
-        .{ "*", .marker_close },
+        .{ "qt", .marker_qtN },
+        .{ "ts", .marker_ts },
+        .{ "*", .marker_milestone_close },
         .{ "ef", .marker_ef_open },
         .{ "ex", .marker_ex_open },
         .{ "esb", .marker_esb },
@@ -665,7 +666,8 @@ pub const Tokenizer = struct {
         marker_characters,
         marker_check,
         marker_end,
-        marker_invalid,
+        marker_s_or_e,
+        invalid_marker_found,
         look_for_book_code,
         book_code_found,
         book_code_check,
@@ -719,7 +721,8 @@ pub const Tokenizer = struct {
             },
             .marker_start => {
                 switch (self.buffer[self.index]) {
-                    'a'...'x' => {
+                    // no marker starts with 'g' or 'y'
+                    'a'...'f', 'h'...'x' => {
                         self.index += 1;
                         continue :state .marker_characters;
                     },
@@ -730,13 +733,13 @@ pub const Tokenizer = struct {
                         continue :state .marker_characters;
                     },
                     '*' => {
-                        result.tag = .marker_close;
+                        result.tag = .marker_milestone_close;
                         self.index += 1;
                         break :state;
                     },
                     else => {
-                        std.debug.print("Unknown value found: {c} @ {d}\n", .{ self.buffer[self.index], result.loc.start });
-                        continue :state .marker_invalid;
+                        self.index += 1;
+                        continue :state .invalid_marker_found;
                     },
                 }
             },
@@ -753,16 +756,13 @@ pub const Tokenizer = struct {
             },
             .marker_check => {
                 if (result.tag == .marker_z) break :state;
-                result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start + 1 .. self.index]) orelse .invalid_marker;
+                result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start + 1 .. self.index]) orelse .marker_invalid;
                 continue :state .marker_end;
             },
             .marker_end => {
                 // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
                 switch (result.tag) {
-                    .invalid_marker => {
-                        std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
-                        break :state;
-                    },
+                    .marker_invalid => continue :state .invalid_marker_found,
                     .marker_id => {
                         self.state = .look_for_book_code;
                         break :state;
@@ -790,20 +790,25 @@ pub const Tokenizer = struct {
                             else => break :state,
                         }
                     },
-                    .marker_qtN_s => {
+                    .marker_ts => {
+                        switch (self.buffer[self.index]) {
+                            '-' => {
+                                self.index += 1;
+                                continue :state .marker_s_or_e;
+                            },
+                            else => break :state,
+                        }
+                    },
+                    .marker_qtN => {
+                        // TODO: redo this branch
                         num: switch (self.buffer[self.index]) {
-                            '0'...'9', '-' => {
+                            '0'...'9' => {
                                 self.index += 1;
                                 continue :num self.buffer[self.index];
                             },
-                            's' => {
+                            '-' => {
                                 self.index += 1;
-                                break :state;
-                            },
-                            'e' => {
-                                result.tag = .marker_qtN_e;
-                                self.index += 1;
-                                break :state;
+                                continue :state .marker_s_or_e;
                             },
                             else => break :state,
                         }
@@ -854,9 +859,30 @@ pub const Tokenizer = struct {
                     else => break :state,
                 }
             },
-            .marker_invalid => {
-                result.tag = .invalid_marker;
-                self.index += 1;
+            .marker_s_or_e => {
+                switch (self.buffer[self.index]) {
+                    's' => {
+                        const int = @intFromEnum(result.tag) + 1;
+                        result.tag = @enumFromInt(int);
+                        self.index += 1;
+                        break :state;
+                    },
+                    'e' => {
+                        const int = @intFromEnum(result.tag) + 2;
+                        result.tag = @enumFromInt(int);
+                        self.index += 1;
+                        break :state;
+                    },
+                    else => {
+                        self.index += 1;
+                        continue :state .invalid_marker_found;
+                    },
+                }
+            },
+            .invalid_marker_found => {
+                result.tag = .marker_invalid;
+                // self.index += 1;
+                std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
                 break :state;
             },
             .look_for_book_code => {
@@ -973,10 +999,326 @@ pub const Tokenizer = struct {
     }
 };
 
+fn testingToken(tag: Token.Tag, start: usize, end: usize) Token {
+    return .{
+        .tag = tag,
+        .loc = .{
+            .start = start,
+            .end = end,
+        },
+    };
+}
+
 test "expect eof from empty" {
-    // const bytes: [_:0]u8 = [0]u8{};
-    // const tzr: Tokenizer = Tokenizer.init(bytes);
-    // const eof: Token = tzr.next();
-    //
-    // try std.testing.expect(eof.tag != .eof);
+    const string: [:0]const u8 = "";
+    const expect = testingToken(.eof, 0, 0);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "skips whitespace" {
+    const string: [:0]const u8 = " \t\r\n";
+    const expect = testingToken(.eof, 4, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect tilde" {
+    const string: [:0]const u8 = "~";
+    const expect = testingToken(.tilde, 0, 1);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect line break" {
+    const string: [:0]const u8 = "//";
+    const expect = testingToken(.line_break, 0, 2);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect invalid marker" {
+    const string: [:0]const u8 = "\\beef";
+    const expect = testingToken(.marker_invalid, 0, 5);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect invalid marker with y" {
+    const string: [:0]const u8 = "\\yak";
+    const expect = testingToken(.marker_invalid, 0, 2);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\id marker" {
+    const string: [:0]const u8 = "\\id";
+    const expect = testingToken(.marker_id, 0, 3);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+    const token: Token = tzr.next();
+
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\id marker followed by a valid book code" {
+    const string: [:0]const u8 = "\\id GEN";
+    const expectId = testingToken(.marker_id, 0, 3);
+    const expectBook = testingToken(.book_GEN, 4, 7);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectId, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectBook, token);
+}
+
+test "expect \\id marker followed by an invalid book code" {
+    const string: [:0]const u8 = "\\id BAD";
+    const expectId = testingToken(.marker_id, 0, 3);
+    const expectBook = testingToken(.invalid_book_code, 4, 7);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectId, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectBook, token);
+}
+
+test "expect \\h without a number after" {
+    const string: [:0]const u8 = "\\h";
+    const expect = testingToken(.marker_hN, 0, 2);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\h with a number after" {
+    const string: [:0]const u8 = "\\h1";
+    const expect = testingToken(.marker_hN, 0, 3);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\h with a long number after" {
+    const string: [:0]const u8 = "\\h11111111";
+    const expect = testingToken(.marker_hN, 0, 10);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\liv without a number" {
+    const string: [:0]const u8 = "\\liv";
+    const expect = testingToken(.marker_livN_open, 0, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\liv* without a number" {
+    const string: [:0]const u8 = "\\liv*";
+    const expect = testingToken(.marker_livN_close, 0, 5);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\livN" {
+    const string: [:0]const u8 = "\\liv5";
+    const expect = testingToken(.marker_livN_open, 0, 5);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\livN*" {
+    const string: [:0]const u8 = "\\liv5*";
+    const expect = testingToken(.marker_livN_close, 0, 6);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\ts without -s or -e" {
+    const string: [:0]const u8 = "\\ts";
+    const expect = testingToken(.marker_ts, 0, 3);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\ts with -s" {
+    const string: [:0]const u8 = "\\ts-s";
+    const expect = testingToken(.marker_ts_s, 0, 5);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\ts with -e" {
+    const string: [:0]const u8 = "\\ts-e";
+    const expect = testingToken(.marker_ts_e, 0, 5);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\qt without -s or -e or number" {
+    const string: [:0]const u8 = "\\qt";
+    const expect = testingToken(.marker_qtN, 0, 3);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\qt without -s or -e but with a number" {
+    const string: [:0]const u8 = "\\qt1";
+    const expect = testingToken(.marker_qtN, 0, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\qt with -s and a number" {
+    const string: [:0]const u8 = "\\qt1-s";
+    const expect = testingToken(.marker_qtN_s, 0, 6);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\qt with -e but and a number" {
+    const string: [:0]const u8 = "\\qt1-e";
+    const expect = testingToken(.marker_qtN_e, 0, 6);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect \\wj*" {
+    const string: [:0]const u8 = "\\wj*";
+    const expect = testingToken(.marker_wj_close, 0, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
+}
+
+test "expect + caller after \\f" {
+    const string: [:0]const u8 = "\\f +";
+    const expectF = testingToken(.marker_f_open, 0, 2);
+    const expectCaller = testingToken(.caller_plus, 3, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectF, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectCaller, token);
+}
+
+test "expect - caller after \\f" {
+    const string: [:0]const u8 = "\\f -";
+    const expectF = testingToken(.marker_f_open, 0, 2);
+    const expectCaller = testingToken(.caller_minus, 3, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectF, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectCaller, token);
+}
+
+test "expect character caller after \\f" {
+    const string: [:0]const u8 = "\\f b";
+    const expectF = testingToken(.marker_f_open, 0, 2);
+    const expectCaller = testingToken(.caller_character, 3, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectF, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectCaller, token);
+}
+
+test "expect number after \\c" {
+    const string: [:0]const u8 = "\\c 1";
+    const expectC = testingToken(.marker_c, 0, 2);
+    const expectNumber = testingToken(.number, 3, 4);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    var token: Token = tzr.next();
+    try std.testing.expectEqual(expectC, token);
+
+    token = tzr.next();
+    try std.testing.expectEqual(expectNumber, token);
+}
+
+test "expect text" {
+    const string: [:0]const u8 = "In the beginning...";
+    const expect = testingToken(.text, 0, 19);
+
+    var tzr: Tokenizer = Tokenizer.init(string);
+
+    const token: Token = tzr.next();
+    try std.testing.expectEqual(expect, token);
 }
