@@ -882,7 +882,7 @@ pub const Tokenizer = struct {
             .invalid_marker_found => {
                 result.tag = .marker_invalid;
                 // self.index += 1;
-                std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
+                // std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
                 break :state;
             },
             .look_for_book_code => {
@@ -918,7 +918,7 @@ pub const Tokenizer = struct {
                         result.tag = .caller_character;
                     },
                     else => {
-                        std.debug.print("Unknown caller found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
+                        // std.debug.print("Unknown caller found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
                         break :state;
                     },
                 }
