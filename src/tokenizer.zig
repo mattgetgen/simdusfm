@@ -1,4 +1,5 @@
 const std = @import("std");
+const StaticStringMap = std.static_string_map.StaticStringMap;
 
 pub const Token = struct {
     tag: Tag,
@@ -249,6 +250,19 @@ pub const Token = struct {
         marker_periph,
         /// EXTERNAL Marker
         marker_z,
+        /// WORD-LEVEL Attributes
+        attribute_lemma,
+        attribute_strong,
+        attribute_srcloc,
+        attribute_gloss,
+        attribute_link_href,
+        attribute_alt,
+        attribute_src,
+        attribute_size,
+        attribute_loc,
+        attribute_copy,
+        attribute_ref,
+        attribute_user_defined,
         /// Book Identifiers
         book_GEN,
         book_EXO,
@@ -367,7 +381,7 @@ pub const Token = struct {
         invalid_book_code,
     };
 
-    pub const marker_identifiers = std.static_string_map.StaticStringMap(Tag).initComptime(.{
+    pub const marker_identifiers = StaticStringMap(Tag).initComptime(.{
         .{ "id", .marker_id },
         .{ "usfm", .marker_usfm },
         .{ "ide", .marker_ide },
@@ -519,7 +533,7 @@ pub const Token = struct {
         return marker_identifiers.get(bytes);
     }
 
-    pub const book_codes = std.static_string_map.StaticStringMap(Tag).initComptime(.{
+    pub const book_codes = StaticStringMap(Tag).initComptime(.{
         .{ "GEN", .book_GEN },
         .{ "EXO", .book_EXO },
         .{ "LEV", .book_LEV },
@@ -637,6 +651,24 @@ pub const Token = struct {
     });
 
     pub fn getBookCode(bytes: []const u8) ?Tag {
+        return book_codes.get(bytes);
+    }
+
+    pub const word_level_attributes = StaticStringMap(Tag).initComptime(.{
+        .{ "lemma", .attribute_lemma },
+        .{ "strong", .attribute_strong },
+        .{ "srcloc", .attribute_srcloc },
+        .{ "gloss", .attribute_gloss },
+        .{ "link-href", .attribute_link_href },
+        .{ "alt", .attribute_alt },
+        .{ "src", .attribute_src },
+        .{ "size", .attribute_size },
+        .{ "loc", .attribute_loc },
+        .{ "copy", .attribute_copy },
+        .{ "ref", .attribute_ref },
+    });
+
+    pub fn getAttribute(bytes: []const u8) ?Tag {
         return book_codes.get(bytes);
     }
 };
