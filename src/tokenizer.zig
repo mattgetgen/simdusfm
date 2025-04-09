@@ -21,6 +21,12 @@ pub const Token = struct {
         /// LINE AND FORMATTING Characters
         tilde,
         line_break,
+        marker_backslash,
+        marker_nested,
+        marker_number,
+        marker_start,
+        marker_end,
+        marker_close,
         marker_invalid,
         /// IDENTIFICATION  Markers
         marker_id,
@@ -46,10 +52,8 @@ pub const Token = struct {
         marker_iliN,
         marker_iot,
         marker_ioN,
-        marker_ior_open,
-        marker_ior_close,
-        marker_iqt_open,
-        marker_iqt_close,
+        marker_ior,
+        marker_iqt,
         marker_iex,
         marker_imteN,
         marker_ie,
@@ -62,23 +66,19 @@ pub const Token = struct {
         marker_sr,
         marker_r,
         /// also a cross-reference marker
-        marker_rq_open,
-        marker_rq_close,
+        marker_rq,
         marker_d,
         marker_sp,
         marker_sdN,
         /// CHAPTER, VERSE Markers
         marker_c,
-        marker_ca_open,
-        marker_ca_close,
+        marker_ca,
         marker_cl,
         marker_cp,
         marker_cd,
         marker_v,
-        marker_va_open,
-        marker_va_close,
-        marker_vp_open,
-        marker_vp_close,
+        marker_va,
+        marker_vp,
         /// PARAGRAPH Markers
         marker_p,
         marker_m,
@@ -100,11 +100,9 @@ pub const Token = struct {
         marker_qN,
         marker_qr,
         marker_qc,
-        marker_qs_open,
-        marker_qs_close,
+        marker_qs,
         marker_qa,
-        marker_qac_open,
-        marker_qac_close,
+        marker_qac,
         marker_qmN,
         marker_qd,
         /// LIST Markers
@@ -112,12 +110,9 @@ pub const Token = struct {
         marker_liN,
         marker_lf,
         marker_limN,
-        marker_litl_open,
-        marker_litl_close,
-        marker_lik_open,
-        marker_lik_close,
-        marker_livN_open,
-        marker_livN_close,
+        marker_litl,
+        marker_lik,
+        marker_livN,
         /// TABLE Markers
         marker_tr,
         marker_thN,
@@ -125,10 +120,8 @@ pub const Token = struct {
         marker_tcN,
         marker_tcrN,
         /// FOOTNOTE Markers
-        marker_f_open,
-        marker_f_close,
-        marker_fe_open,
-        marker_fe_close,
+        marker_f,
+        marker_fe,
         marker_fr,
         marker_fq,
         marker_fqa,
@@ -136,116 +129,70 @@ pub const Token = struct {
         marker_fl,
         marker_fw,
         marker_fp,
-        marker_fv_open,
-        marker_fv_close,
+        marker_fv,
         marker_ft,
-        marker_fdc_open,
-        marker_fdc_close,
-        marker_fm_open,
-        marker_fm_close,
+        marker_fdc,
+        marker_fm,
         /// CROSS REFERENCE Markers
-        marker_x_open,
-        marker_x_close,
+        marker_x,
         marker_xo,
         marker_xk,
         marker_xq,
         marker_xt,
         marker_xta,
-        marker_xop_open,
-        marker_xop_close,
-        marker_xot_open,
-        marker_xot_close,
-        marker_xnt_open,
-        marker_xnt_close,
-        marker_xdc_open,
-        marker_xdc_close,
+        marker_xop,
+        marker_xot,
+        marker_xnt,
+        marker_xdc,
         /// SPECIAL TEXT Markers
-        marker_add_open,
-        marker_add_close,
-        marker_bk_open,
-        marker_bk_close,
-        marker_dc_open,
-        marker_dc_close,
-        marker_k_open,
-        marker_k_close,
+        marker_add,
+        marker_bk,
+        marker_dc,
+        marker_k,
         marker_lit,
-        marker_nd_open,
-        marker_nd_close,
-        marker_ord_open,
-        marker_ord_close,
-        marker_pn_open,
-        marker_pn_close,
-        marker_png_open,
-        marker_png_close,
-        marker_addpn_open,
-        marker_addpn_close,
-        marker_qt_open,
-        marker_qt_close,
-        marker_sig_open,
-        marker_sig_close,
-        marker_sls_open,
-        marker_sls_close,
-        marker_tl_open,
-        marker_tl_close,
-        marker_wj_open,
-        marker_wj_close,
+        marker_nd,
+        marker_ord,
+        marker_pn,
+        marker_png,
+        marker_addpn,
+        marker_qt,
+        marker_sig,
+        marker_sls,
+        marker_tl,
+        marker_wj,
         /// CHARACTER STYLING Markers
-        marker_em_open,
-        marker_em_close,
-        marker_bd_open,
-        marker_bd_close,
-        marker_it_open,
-        marker_it_close,
-        marker_bdit_open,
-        marker_bdit_close,
-        marker_no_open,
-        marker_no_close,
-        marker_sc_open,
-        marker_sc_close,
-        marker_sup_open,
-        marker_sup_close,
+        marker_em,
+        marker_bd,
+        marker_it,
+        marker_bdit,
+        marker_no,
+        marker_sc,
+        marker_sup,
         /// PAGE BREAK Marker
         marker_page_break,
         /// SPECIAL FEATURE Markers
-        marker_fig_open,
-        marker_fig_close,
-        marker_ndx_open,
-        marker_ndx_close,
-        marker_rb_open,
-        marker_rb_close,
-        marker_pro_open,
-        marker_pro_close,
-        marker_w_open,
-        marker_w_close,
-        marker_wg_open,
-        marker_wg_close,
-        marker_wh_open,
-        marker_wh_close,
-        marker_wa_open,
-        marker_wa_close,
+        marker_fig,
+        marker_ndx,
+        marker_rb,
+        marker_pro,
+        marker_w,
+        marker_wg,
+        marker_wh,
+        marker_wa,
         /// LINK Markers
-        marker_jmp_open,
-        marker_jmp_close,
+        marker_jmp,
         /// MILESTONE Markers
         marker_qtN,
-        marker_qtN_s,
-        marker_qtN_e,
         marker_ts,
-        marker_ts_s,
-        marker_ts_e,
-        marker_milestone_close,
         /// EXTENDED FOOTNOTE Markers
-        marker_ef_open,
-        marker_ef_close,
+        marker_ef,
         /// EXTENDED CROSS REFERENCE Markers
-        marker_ex_open,
-        marker_ex_close,
+        marker_ex,
         /// SIDEBAR Markers
         marker_esb,
         marker_esbe,
         /// CONTENT CATEGORY Markers
-        marker_cat_open,
-        marker_cat_close,
+        marker_cat,
         /// PERIPHERAL Marker
         marker_periph,
         /// EXTERNAL Marker
@@ -404,8 +351,8 @@ pub const Token = struct {
         .{ "ili", .marker_iliN },
         .{ "iot", .marker_iot },
         .{ "io", .marker_ioN },
-        .{ "ior", .marker_ior_open },
-        .{ "iqt", .marker_iqt_open },
+        .{ "ior", .marker_ior },
+        .{ "iqt", .marker_iqt },
         .{ "iex", .marker_iex },
         .{ "imte", .marker_imteN },
         .{ "ie", .marker_ie },
@@ -416,18 +363,18 @@ pub const Token = struct {
         .{ "s", .marker_sN },
         .{ "sr", .marker_sr },
         .{ "r", .marker_r },
-        .{ "rq", .marker_rq_open },
+        .{ "rq", .marker_rq },
         .{ "d", .marker_d },
         .{ "sp", .marker_sp },
         .{ "sd", .marker_sdN },
         .{ "c", .marker_c },
-        .{ "ca", .marker_ca_open },
+        .{ "ca", .marker_ca },
         .{ "cl", .marker_cl },
         .{ "cp", .marker_cp },
         .{ "cd", .marker_cd },
         .{ "v", .marker_v },
-        .{ "va", .marker_va_open },
-        .{ "vp", .marker_vp_open },
+        .{ "va", .marker_va },
+        .{ "vp", .marker_vp },
         .{ "p", .marker_p },
         .{ "m", .marker_m },
         .{ "po", .marker_po },
@@ -446,25 +393,25 @@ pub const Token = struct {
         .{ "q", .marker_qN },
         .{ "qr", .marker_qr },
         .{ "qc", .marker_qc },
-        .{ "qs", .marker_qs_open },
+        .{ "qs", .marker_qs },
         .{ "qa", .marker_qa },
-        .{ "qac", .marker_qac_open },
+        .{ "qac", .marker_qac },
         .{ "qm", .marker_qmN },
         .{ "qd", .marker_qd },
         .{ "lh", .marker_lh },
         .{ "li", .marker_liN },
         .{ "lf", .marker_lf },
         .{ "lim", .marker_limN },
-        .{ "litl", .marker_litl_open },
-        .{ "lik", .marker_lik_open },
-        .{ "liv", .marker_livN_open },
+        .{ "litl", .marker_litl },
+        .{ "lik", .marker_lik },
+        .{ "liv", .marker_livN },
         .{ "tr", .marker_tr },
         .{ "th", .marker_thN },
         .{ "thr", .marker_thrN },
         .{ "tc", .marker_tcN },
         .{ "tcr", .marker_tcrN },
-        .{ "f", .marker_f_open },
-        .{ "fe", .marker_fe_open },
+        .{ "f", .marker_f },
+        .{ "fe", .marker_fe },
         .{ "fr", .marker_fr },
         .{ "fq", .marker_fq },
         .{ "fqa", .marker_fqa },
@@ -472,60 +419,59 @@ pub const Token = struct {
         .{ "fl", .marker_fl },
         .{ "fw", .marker_fw },
         .{ "fp", .marker_fp },
-        .{ "fv", .marker_fv_open },
+        .{ "fv", .marker_fv },
         .{ "ft", .marker_ft },
-        .{ "fdc", .marker_fdc_open },
-        .{ "fm", .marker_fm_open },
-        .{ "x", .marker_x_open },
+        .{ "fdc", .marker_fdc },
+        .{ "fm", .marker_fm },
+        .{ "x", .marker_x },
         .{ "xo", .marker_xo },
         .{ "xk", .marker_xk },
         .{ "xq", .marker_xq },
         .{ "xt", .marker_xt },
         .{ "xta", .marker_xta },
-        .{ "xop", .marker_xop_open },
-        .{ "xot", .marker_xot_open },
-        .{ "xnt", .marker_xnt_open },
-        .{ "xdc", .marker_xdc_open },
-        .{ "add", .marker_add_open },
-        .{ "bk", .marker_bk_open },
-        .{ "dc", .marker_dc_open },
-        .{ "k", .marker_k_open },
+        .{ "xop", .marker_xop },
+        .{ "xot", .marker_xot },
+        .{ "xnt", .marker_xnt },
+        .{ "xdc", .marker_xdc },
+        .{ "add", .marker_add },
+        .{ "bk", .marker_bk },
+        .{ "dc", .marker_dc },
+        .{ "k", .marker_k },
         .{ "lit", .marker_lit },
-        .{ "nd", .marker_nd_open },
-        .{ "ord", .marker_ord_open },
-        .{ "pn", .marker_pn_open },
-        .{ "png", .marker_png_open },
-        .{ "addpn", .marker_addpn_open },
-        .{ "qt", .marker_qt_open },
-        .{ "sig", .marker_sig_open },
-        .{ "sls", .marker_sls_open },
-        .{ "tl", .marker_tl_open },
-        .{ "wj", .marker_wj_open },
-        .{ "em", .marker_em_open },
-        .{ "bd", .marker_bd_open },
-        .{ "it", .marker_it_open },
-        .{ "bdit", .marker_bdit_open },
-        .{ "no", .marker_no_open },
-        .{ "sc", .marker_sc_open },
-        .{ "sup", .marker_sup_open },
-        .{ "page_break", .marker_page_break },
-        .{ "fig", .marker_fig_open },
-        .{ "ndx", .marker_ndx_open },
-        .{ "rb", .marker_rb_open },
-        .{ "pro", .marker_pro_open },
-        .{ "w", .marker_w_open },
-        .{ "wg", .marker_wg_open },
-        .{ "wh", .marker_wh_open },
-        .{ "wa", .marker_wa_open },
-        .{ "jmp", .marker_jmp_open },
+        .{ "nd", .marker_nd },
+        .{ "ord", .marker_ord },
+        .{ "pn", .marker_pn },
+        .{ "png", .marker_png },
+        .{ "addpn", .marker_addpn },
+        .{ "qt", .marker_qt },
+        .{ "sig", .marker_sig },
+        .{ "sls", .marker_sls },
+        .{ "tl", .marker_tl },
+        .{ "wj", .marker_wj },
+        .{ "em", .marker_em },
+        .{ "bd", .marker_bd },
+        .{ "it", .marker_it },
+        .{ "bdit", .marker_bdit },
+        .{ "no", .marker_no },
+        .{ "sc", .marker_sc },
+        .{ "sup", .marker_sup },
+        .{ "pb", .marker_page_break },
+        .{ "fig", .marker_fig },
+        .{ "ndx", .marker_ndx },
+        .{ "rb", .marker_rb },
+        .{ "pro", .marker_pro },
+        .{ "w", .marker_w },
+        .{ "wg", .marker_wg },
+        .{ "wh", .marker_wh },
+        .{ "wa", .marker_wa },
+        .{ "jmp", .marker_jmp },
         .{ "qt", .marker_qtN },
         .{ "ts", .marker_ts },
-        .{ "*", .marker_milestone_close },
-        .{ "ef", .marker_ef_open },
-        .{ "ex", .marker_ex_open },
+        .{ "ef", .marker_ef },
+        .{ "ex", .marker_ex },
         .{ "esb", .marker_esb },
         .{ "esbe", .marker_esbe },
-        .{ "cat", .marker_cat_open },
+        .{ "cat", .marker_cat },
         .{ "periph", .marker_periph },
     });
 
@@ -694,10 +640,11 @@ pub const Tokenizer = struct {
     const State = enum {
         start,
         invalid_found,
-        marker_start,
+        marker_first,
         marker_characters,
         marker_check,
-        marker_end,
+        marker_num,
+        marker_last,
         marker_s_or_e,
         invalid_marker_found,
         look_for_book_code,
@@ -736,7 +683,9 @@ pub const Tokenizer = struct {
                 '\\' => {
                     result.loc.start = self.index;
                     self.index += 1;
-                    continue :state .marker_start;
+                    result.tag = .marker_backslash;
+                    self.state = .marker_first;
+                    break :state;
                 },
                 '~' => {
                     result.tag = .tilde;
@@ -751,7 +700,8 @@ pub const Tokenizer = struct {
                     continue :state .search_until_not_text;
                 },
             },
-            .marker_start => {
+            .marker_first => {
+                self.state = .start;
                 switch (self.buffer[self.index]) {
                     // no marker starts with 'g' or 'y'
                     'a'...'f', 'h'...'x' => {
@@ -764,8 +714,14 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         continue :state .marker_characters;
                     },
+                    '+' => {
+                        result.tag = .marker_nested;
+                        self.index += 1;
+                        self.state = .marker_characters;
+                        break :state;
+                    },
                     '*' => {
-                        result.tag = .marker_milestone_close;
+                        result.tag = .marker_close;
                         self.index += 1;
                         break :state;
                     },
@@ -776,6 +732,7 @@ pub const Tokenizer = struct {
                 }
             },
             .marker_characters => {
+                self.state = .start;
                 switch (self.buffer[self.index]) {
                     'a'...'z' => {
                         self.index += 1;
@@ -787,127 +744,161 @@ pub const Tokenizer = struct {
                 }
             },
             .marker_check => {
-                if (result.tag == .marker_z) break :state;
-                result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start + 1 .. self.index]) orelse .marker_invalid;
-                continue :state .marker_end;
+                if (result.tag != .marker_z) {
+                    result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start..self.index]) orelse .marker_invalid;
+                }
+                self.index += 1;
+                self.state = .marker_last;
+                break :state;
             },
-            .marker_end => {
+            .marker_last => {
+                self.state = .start;
+                switch (self.buffer[self.index]) {
+                    '*' => {
+                        self.index += 1;
+                        result.tag = .marker_close;
+                        break :state;
+                    },
+                    '0'...'9' => {
+                        self.index += 1;
+                        result.tag = .marker_number;
+                        continue :state .marker_num;
+                    },
+                    '-' => {
+                        self.index += 1;
+                        continue :state .marker_s_or_e;
+                    },
+                    else => {
+                        continue :state .start;
+                    },
+                }
                 // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
-                switch (result.tag) {
-                    .marker_invalid => continue :state .invalid_marker_found,
-                    .marker_id => {
-                        self.state = .look_for_book_code;
+                // switch (result.tag) {
+                //     .marker_invalid => continue :state .invalid_marker_found,
+                //     .marker_id => {
+                //         self.state = .look_for_book_code;
+                //         break :state;
+                //     },
+                //     .marker_hN, .marker_tocN, .marker_tocaN, .marker_imtN, .marker_isN, .marker_iqN, .marker_iliN, .marker_ioN, .marker_imteN, .marker_mtN, .marker_mteN, .marker_msN, .marker_sN, .marker_sdN, .marker_piN, .marker_phN, .marker_qN, .marker_qmN, .marker_liN, .marker_limN, .marker_thN, .marker_thrN, .marker_tcN, .marker_tcrN => {
+                //         num: switch (self.buffer[self.index]) {
+                //             '0'...'9' => {
+                //                 self.index += 1;
+                //                 continue :num self.buffer[self.index];
+                //             },
+                //             else => break :state,
+                //         }
+                //     },
+                //     .marker_livN_open => {
+                //         num: switch (self.buffer[self.index]) {
+                //             '0'...'9' => {
+                //                 self.index += 1;
+                //                 continue :num self.buffer[self.index];
+                //             },
+                //             '*' => {
+                //                 result.tag = .marker_livN_close;
+                //                 self.index += 1;
+                //                 break :state;
+                //             },
+                //             else => break :state,
+                //         }
+                //     },
+                //     .marker_ts => {
+                //         switch (self.buffer[self.index]) {
+                //             '-' => {
+                //                 self.index += 1;
+                //                 continue :state .marker_s_or_e;
+                //             },
+                //             else => break :state,
+                //         }
+                //     },
+                //     .marker_qtN => {
+                //         // TODO: redo this branch
+                //         num: switch (self.buffer[self.index]) {
+                //             '0'...'9' => {
+                //                 self.index += 1;
+                //                 continue :num self.buffer[self.index];
+                //             },
+                //             '-' => {
+                //                 self.index += 1;
+                //                 continue :state .marker_s_or_e;
+                //             },
+                //             else => break :state,
+                //         }
+                //     },
+                //     .marker_ior_open, .marker_iqt_open, .marker_rq_open, .marker_vp_open, .marker_qs_open, .marker_qac_open, .marker_litl_open, .marker_lik_open, .marker_fdc_open, .marker_fm_open, .marker_xop_open, .marker_xot_open, .marker_xnt_open, .marker_xdc_open, .marker_add_open, .marker_bk_open, .marker_dc_open, .marker_k_open, .marker_nd_open, .marker_ord_open, .marker_pn_open, .marker_png_open, .marker_addpn_open, .marker_qt_open, .marker_sig_open, .marker_sls_open, .marker_tl_open, .marker_wj_open, .marker_em_open, .marker_bd_open, .marker_it_open, .marker_bdit_open, .marker_no_open, .marker_sc_open, .marker_sup_open, .marker_fig_open, .marker_ndx_open, .marker_rb_open, .marker_pro_open, .marker_w_open, .marker_wg_open, .marker_wh_open, .marker_wa_open, .marker_jmp_open, .marker_ef_open, .marker_ex_open, .marker_cat_open => {
+                //         switch (self.buffer[self.index]) {
+                //             '*' => {
+                //                 const int = @intFromEnum(result.tag) + 1;
+                //                 result.tag = @enumFromInt(int);
+                //                 self.index += 1;
+                //                 break :state;
+                //             },
+                //             else => break :state,
+                //         }
+                //     },
+                //     .marker_f_open, .marker_fe_open, .marker_x_open => {
+                //         switch (self.buffer[self.index]) {
+                //             '*' => {
+                //                 const int = @intFromEnum(result.tag) + 1;
+                //                 result.tag = @enumFromInt(int);
+                //                 self.index += 1;
+                //                 break :state;
+                //             },
+                //             else => {
+                //                 self.state = .look_for_caller;
+                //                 break :state;
+                //             },
+                //         }
+                //     },
+                //     .marker_ca_open, .marker_va_open, .marker_fv_open => {
+                //         switch (self.buffer[self.index]) {
+                //             '*' => {
+                //                 const int = @intFromEnum(result.tag) + 1;
+                //                 result.tag = @enumFromInt(int);
+                //                 self.index += 1;
+                //                 break :state;
+                //             },
+                //             else => {
+                //                 self.state = .look_for_number;
+                //                 break :state;
+                //             },
+                //         }
+                //     },
+                //     .marker_c, .marker_v => {
+                //         self.state = .look_for_number;
+                //         break :state;
+                //     },
+                //     else => break :state,
+                // }
+            },
+            .marker_num => {
+                switch (self.buffer[self.index]) {
+                    '0'...'9' => {
+                        self.index += 1;
+                        self.state = .marker_last;
                         break :state;
                     },
-                    .marker_hN, .marker_tocN, .marker_tocaN, .marker_imtN, .marker_isN, .marker_iqN, .marker_iliN, .marker_ioN, .marker_imteN, .marker_mtN, .marker_mteN, .marker_msN, .marker_sN, .marker_sdN, .marker_piN, .marker_phN, .marker_qN, .marker_qmN, .marker_liN, .marker_limN, .marker_thN, .marker_thrN, .marker_tcN, .marker_tcrN => {
-                        num: switch (self.buffer[self.index]) {
-                            '0'...'9' => {
-                                self.index += 1;
-                                continue :num self.buffer[self.index];
-                            },
-                            else => break :state,
-                        }
-                    },
-                    .marker_livN_open => {
-                        num: switch (self.buffer[self.index]) {
-                            '0'...'9' => {
-                                self.index += 1;
-                                continue :num self.buffer[self.index];
-                            },
-                            '*' => {
-                                result.tag = .marker_livN_close;
-                                self.index += 1;
-                                break :state;
-                            },
-                            else => break :state,
-                        }
-                    },
-                    .marker_ts => {
-                        switch (self.buffer[self.index]) {
-                            '-' => {
-                                self.index += 1;
-                                continue :state .marker_s_or_e;
-                            },
-                            else => break :state,
-                        }
-                    },
-                    .marker_qtN => {
-                        // TODO: redo this branch
-                        num: switch (self.buffer[self.index]) {
-                            '0'...'9' => {
-                                self.index += 1;
-                                continue :num self.buffer[self.index];
-                            },
-                            '-' => {
-                                self.index += 1;
-                                continue :state .marker_s_or_e;
-                            },
-                            else => break :state,
-                        }
-                    },
-                    .marker_ior_open, .marker_iqt_open, .marker_rq_open, .marker_vp_open, .marker_qs_open, .marker_qac_open, .marker_litl_open, .marker_lik_open, .marker_fdc_open, .marker_fm_open, .marker_xop_open, .marker_xot_open, .marker_xnt_open, .marker_xdc_open, .marker_add_open, .marker_bk_open, .marker_dc_open, .marker_k_open, .marker_nd_open, .marker_ord_open, .marker_pn_open, .marker_png_open, .marker_addpn_open, .marker_qt_open, .marker_sig_open, .marker_sls_open, .marker_tl_open, .marker_wj_open, .marker_em_open, .marker_bd_open, .marker_it_open, .marker_bdit_open, .marker_no_open, .marker_sc_open, .marker_sup_open, .marker_fig_open, .marker_ndx_open, .marker_rb_open, .marker_pro_open, .marker_w_open, .marker_wg_open, .marker_wh_open, .marker_wa_open, .marker_jmp_open, .marker_ef_open, .marker_ex_open, .marker_cat_open => {
-                        switch (self.buffer[self.index]) {
-                            '*' => {
-                                const int = @intFromEnum(result.tag) + 1;
-                                result.tag = @enumFromInt(int);
-                                self.index += 1;
-                                break :state;
-                            },
-                            else => break :state,
-                        }
-                    },
-                    .marker_f_open, .marker_fe_open, .marker_x_open => {
-                        switch (self.buffer[self.index]) {
-                            '*' => {
-                                const int = @intFromEnum(result.tag) + 1;
-                                result.tag = @enumFromInt(int);
-                                self.index += 1;
-                                break :state;
-                            },
-                            else => {
-                                self.state = .look_for_caller;
-                                break :state;
-                            },
-                        }
-                    },
-                    .marker_ca_open, .marker_va_open, .marker_fv_open => {
-                        switch (self.buffer[self.index]) {
-                            '*' => {
-                                const int = @intFromEnum(result.tag) + 1;
-                                result.tag = @enumFromInt(int);
-                                self.index += 1;
-                                break :state;
-                            },
-                            else => {
-                                self.state = .look_for_number;
-                                break :state;
-                            },
-                        }
-                    },
-                    .marker_c, .marker_v => {
-                        self.state = .look_for_number;
+                    else => {
+                        self.state = .marker_last;
                         break :state;
                     },
-                    else => break :state,
                 }
             },
             .marker_s_or_e => {
                 switch (self.buffer[self.index]) {
                     's' => {
-                        const int = @intFromEnum(result.tag) + 1;
-                        result.tag = @enumFromInt(int);
+                        result.tag = .marker_start;
                         self.index += 1;
                         break :state;
                     },
                     'e' => {
-                        const int = @intFromEnum(result.tag) + 2;
-                        result.tag = @enumFromInt(int);
+                        result.tag = .marker_end;
                         self.index += 1;
                         break :state;
                     },
                     else => {
                         self.index += 1;
-                        continue :state .invalid_marker_found;
+                        continue :state .invalid_found;
                     },
                 }
             },
@@ -1002,6 +993,7 @@ pub const Tokenizer = struct {
                     '/' => {
                         result.tag = .line_break;
                         self.index += 1;
+                        break :state;
                     },
                     else => {
                         self.index -= 1;
