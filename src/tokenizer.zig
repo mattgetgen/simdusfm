@@ -747,12 +747,12 @@ pub const Tokenizer = struct {
                 if (result.tag != .marker_z) {
                     result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start..self.index]) orelse .marker_invalid;
                 }
-                self.index += 1;
                 self.state = .marker_last;
                 break :state;
             },
             .marker_last => {
                 self.state = .start;
+                // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
                 switch (self.buffer[self.index]) {
                     '*' => {
                         self.index += 1;
@@ -772,111 +772,12 @@ pub const Tokenizer = struct {
                         continue :state .start;
                     },
                 }
-                // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
-                // switch (result.tag) {
-                //     .marker_invalid => continue :state .invalid_marker_found,
-                //     .marker_id => {
-                //         self.state = .look_for_book_code;
-                //         break :state;
-                //     },
-                //     .marker_hN, .marker_tocN, .marker_tocaN, .marker_imtN, .marker_isN, .marker_iqN, .marker_iliN, .marker_ioN, .marker_imteN, .marker_mtN, .marker_mteN, .marker_msN, .marker_sN, .marker_sdN, .marker_piN, .marker_phN, .marker_qN, .marker_qmN, .marker_liN, .marker_limN, .marker_thN, .marker_thrN, .marker_tcN, .marker_tcrN => {
-                //         num: switch (self.buffer[self.index]) {
-                //             '0'...'9' => {
-                //                 self.index += 1;
-                //                 continue :num self.buffer[self.index];
-                //             },
-                //             else => break :state,
-                //         }
-                //     },
-                //     .marker_livN_open => {
-                //         num: switch (self.buffer[self.index]) {
-                //             '0'...'9' => {
-                //                 self.index += 1;
-                //                 continue :num self.buffer[self.index];
-                //             },
-                //             '*' => {
-                //                 result.tag = .marker_livN_close;
-                //                 self.index += 1;
-                //                 break :state;
-                //             },
-                //             else => break :state,
-                //         }
-                //     },
-                //     .marker_ts => {
-                //         switch (self.buffer[self.index]) {
-                //             '-' => {
-                //                 self.index += 1;
-                //                 continue :state .marker_s_or_e;
-                //             },
-                //             else => break :state,
-                //         }
-                //     },
-                //     .marker_qtN => {
-                //         // TODO: redo this branch
-                //         num: switch (self.buffer[self.index]) {
-                //             '0'...'9' => {
-                //                 self.index += 1;
-                //                 continue :num self.buffer[self.index];
-                //             },
-                //             '-' => {
-                //                 self.index += 1;
-                //                 continue :state .marker_s_or_e;
-                //             },
-                //             else => break :state,
-                //         }
-                //     },
-                //     .marker_ior_open, .marker_iqt_open, .marker_rq_open, .marker_vp_open, .marker_qs_open, .marker_qac_open, .marker_litl_open, .marker_lik_open, .marker_fdc_open, .marker_fm_open, .marker_xop_open, .marker_xot_open, .marker_xnt_open, .marker_xdc_open, .marker_add_open, .marker_bk_open, .marker_dc_open, .marker_k_open, .marker_nd_open, .marker_ord_open, .marker_pn_open, .marker_png_open, .marker_addpn_open, .marker_qt_open, .marker_sig_open, .marker_sls_open, .marker_tl_open, .marker_wj_open, .marker_em_open, .marker_bd_open, .marker_it_open, .marker_bdit_open, .marker_no_open, .marker_sc_open, .marker_sup_open, .marker_fig_open, .marker_ndx_open, .marker_rb_open, .marker_pro_open, .marker_w_open, .marker_wg_open, .marker_wh_open, .marker_wa_open, .marker_jmp_open, .marker_ef_open, .marker_ex_open, .marker_cat_open => {
-                //         switch (self.buffer[self.index]) {
-                //             '*' => {
-                //                 const int = @intFromEnum(result.tag) + 1;
-                //                 result.tag = @enumFromInt(int);
-                //                 self.index += 1;
-                //                 break :state;
-                //             },
-                //             else => break :state,
-                //         }
-                //     },
-                //     .marker_f_open, .marker_fe_open, .marker_x_open => {
-                //         switch (self.buffer[self.index]) {
-                //             '*' => {
-                //                 const int = @intFromEnum(result.tag) + 1;
-                //                 result.tag = @enumFromInt(int);
-                //                 self.index += 1;
-                //                 break :state;
-                //             },
-                //             else => {
-                //                 self.state = .look_for_caller;
-                //                 break :state;
-                //             },
-                //         }
-                //     },
-                //     .marker_ca_open, .marker_va_open, .marker_fv_open => {
-                //         switch (self.buffer[self.index]) {
-                //             '*' => {
-                //                 const int = @intFromEnum(result.tag) + 1;
-                //                 result.tag = @enumFromInt(int);
-                //                 self.index += 1;
-                //                 break :state;
-                //             },
-                //             else => {
-                //                 self.state = .look_for_number;
-                //                 break :state;
-                //             },
-                //         }
-                //     },
-                //     .marker_c, .marker_v => {
-                //         self.state = .look_for_number;
-                //         break :state;
-                //     },
-                //     else => break :state,
-                // }
             },
             .marker_num => {
-                switch (self.buffer[self.index]) {
+                num: switch (self.buffer[self.index]) {
                     '0'...'9' => {
                         self.index += 1;
-                        self.state = .marker_last;
-                        break :state;
+                        continue :num self.buffer[self.index];
                     },
                     else => {
                         self.state = .marker_last;
@@ -1024,7 +925,7 @@ pub const Tokenizer = struct {
     }
 };
 
-fn testingToken(tag: Token.Tag, start: usize, end: usize) Token {
+fn mockToken(tag: Token.Tag, start: usize, end: usize) Token {
     return .{
         .tag = tag,
         .loc = .{
@@ -1036,7 +937,7 @@ fn testingToken(tag: Token.Tag, start: usize, end: usize) Token {
 
 test "expect eof from empty" {
     const string: [:0]const u8 = "";
-    const expect = testingToken(.eof, 0, 0);
+    const expect = mockToken(.eof, 0, 0);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1046,7 +947,7 @@ test "expect eof from empty" {
 
 test "skips whitespace" {
     const string: [:0]const u8 = " \t\r\n";
-    const expect = testingToken(.eof, 4, 4);
+    const expect = mockToken(.eof, 4, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1056,7 +957,7 @@ test "skips whitespace" {
 
 test "expect tilde" {
     const string: [:0]const u8 = "~";
-    const expect = testingToken(.tilde, 0, 1);
+    const expect = mockToken(.tilde, 0, 1);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1066,7 +967,7 @@ test "expect tilde" {
 
 test "expect line break" {
     const string: [:0]const u8 = "//";
-    const expect = testingToken(.line_break, 0, 2);
+    const expect = mockToken(.line_break, 0, 2);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1076,7 +977,7 @@ test "expect line break" {
 
 test "expect invalid marker" {
     const string: [:0]const u8 = "\\beef";
-    const expect = testingToken(.marker_invalid, 0, 5);
+    const expect = mockToken(.marker_invalid, 0, 5);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1086,7 +987,7 @@ test "expect invalid marker" {
 
 test "expect invalid marker with y" {
     const string: [:0]const u8 = "\\yak";
-    const expect = testingToken(.marker_invalid, 0, 2);
+    const expect = mockToken(.marker_invalid, 0, 2);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1096,7 +997,7 @@ test "expect invalid marker with y" {
 
 test "expect \\id marker" {
     const string: [:0]const u8 = "\\id";
-    const expect = testingToken(.marker_id, 0, 3);
+    const expect = mockToken(.marker_id, 0, 3);
 
     var tzr: Tokenizer = Tokenizer.init(string);
     const token: Token = tzr.next();
@@ -1106,8 +1007,8 @@ test "expect \\id marker" {
 
 test "expect \\id marker followed by a valid book code" {
     const string: [:0]const u8 = "\\id GEN";
-    const expectId = testingToken(.marker_id, 0, 3);
-    const expectBook = testingToken(.book_GEN, 4, 7);
+    const expectId = mockToken(.marker_id, 0, 3);
+    const expectBook = mockToken(.book_GEN, 4, 7);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1120,8 +1021,8 @@ test "expect \\id marker followed by a valid book code" {
 
 test "expect \\id marker followed by an invalid book code" {
     const string: [:0]const u8 = "\\id BAD";
-    const expectId = testingToken(.marker_id, 0, 3);
-    const expectBook = testingToken(.invalid_book_code, 4, 7);
+    const expectId = mockToken(.marker_id, 0, 3);
+    const expectBook = mockToken(.invalid_book_code, 4, 7);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1134,7 +1035,7 @@ test "expect \\id marker followed by an invalid book code" {
 
 test "expect \\h without a number after" {
     const string: [:0]const u8 = "\\h";
-    const expect = testingToken(.marker_hN, 0, 2);
+    const expect = mockToken(.marker_hN, 0, 2);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1144,7 +1045,7 @@ test "expect \\h without a number after" {
 
 test "expect \\h with a number after" {
     const string: [:0]const u8 = "\\h1";
-    const expect = testingToken(.marker_hN, 0, 3);
+    const expect = mockToken(.marker_hN, 0, 3);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1154,7 +1055,7 @@ test "expect \\h with a number after" {
 
 test "expect \\h with a long number after" {
     const string: [:0]const u8 = "\\h11111111";
-    const expect = testingToken(.marker_hN, 0, 10);
+    const expect = mockToken(.marker_hN, 0, 10);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1164,7 +1065,7 @@ test "expect \\h with a long number after" {
 
 test "expect \\liv without a number" {
     const string: [:0]const u8 = "\\liv";
-    const expect = testingToken(.marker_livN_open, 0, 4);
+    const expect = mockToken(.marker_livN_open, 0, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1174,7 +1075,7 @@ test "expect \\liv without a number" {
 
 test "expect \\liv* without a number" {
     const string: [:0]const u8 = "\\liv*";
-    const expect = testingToken(.marker_livN_close, 0, 5);
+    const expect = mockToken(.marker_livN_close, 0, 5);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1184,7 +1085,7 @@ test "expect \\liv* without a number" {
 
 test "expect \\livN" {
     const string: [:0]const u8 = "\\liv5";
-    const expect = testingToken(.marker_livN_open, 0, 5);
+    const expect = mockToken(.marker_livN_open, 0, 5);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1194,7 +1095,7 @@ test "expect \\livN" {
 
 test "expect \\livN*" {
     const string: [:0]const u8 = "\\liv5*";
-    const expect = testingToken(.marker_livN_close, 0, 6);
+    const expect = mockToken(.marker_livN_close, 0, 6);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1204,7 +1105,7 @@ test "expect \\livN*" {
 
 test "expect \\ts without -s or -e" {
     const string: [:0]const u8 = "\\ts";
-    const expect = testingToken(.marker_ts, 0, 3);
+    const expect = mockToken(.marker_ts, 0, 3);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1214,7 +1115,7 @@ test "expect \\ts without -s or -e" {
 
 test "expect \\ts with -s" {
     const string: [:0]const u8 = "\\ts-s";
-    const expect = testingToken(.marker_ts_s, 0, 5);
+    const expect = mockToken(.marker_ts_s, 0, 5);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1224,7 +1125,7 @@ test "expect \\ts with -s" {
 
 test "expect \\ts with -e" {
     const string: [:0]const u8 = "\\ts-e";
-    const expect = testingToken(.marker_ts_e, 0, 5);
+    const expect = mockToken(.marker_ts_e, 0, 5);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1234,7 +1135,7 @@ test "expect \\ts with -e" {
 
 test "expect \\qt without -s or -e or number" {
     const string: [:0]const u8 = "\\qt";
-    const expect = testingToken(.marker_qtN, 0, 3);
+    const expect = mockToken(.marker_qtN, 0, 3);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1244,7 +1145,7 @@ test "expect \\qt without -s or -e or number" {
 
 test "expect \\qt without -s or -e but with a number" {
     const string: [:0]const u8 = "\\qt1";
-    const expect = testingToken(.marker_qtN, 0, 4);
+    const expect = mockToken(.marker_qtN, 0, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1254,7 +1155,7 @@ test "expect \\qt without -s or -e but with a number" {
 
 test "expect \\qt with -s and a number" {
     const string: [:0]const u8 = "\\qt1-s";
-    const expect = testingToken(.marker_qtN_s, 0, 6);
+    const expect = mockToken(.marker_qtN_s, 0, 6);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1264,7 +1165,7 @@ test "expect \\qt with -s and a number" {
 
 test "expect \\qt with -e but and a number" {
     const string: [:0]const u8 = "\\qt1-e";
-    const expect = testingToken(.marker_qtN_e, 0, 6);
+    const expect = mockToken(.marker_qtN_e, 0, 6);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1274,7 +1175,7 @@ test "expect \\qt with -e but and a number" {
 
 test "expect \\wj*" {
     const string: [:0]const u8 = "\\wj*";
-    const expect = testingToken(.marker_wj_close, 0, 4);
+    const expect = mockToken(.marker_wj_close, 0, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1284,8 +1185,8 @@ test "expect \\wj*" {
 
 test "expect + caller after \\f" {
     const string: [:0]const u8 = "\\f +";
-    const expectF = testingToken(.marker_f_open, 0, 2);
-    const expectCaller = testingToken(.caller_plus, 3, 4);
+    const expectF = mockToken(.marker_f_open, 0, 2);
+    const expectCaller = mockToken(.caller_plus, 3, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1298,8 +1199,8 @@ test "expect + caller after \\f" {
 
 test "expect - caller after \\f" {
     const string: [:0]const u8 = "\\f -";
-    const expectF = testingToken(.marker_f_open, 0, 2);
-    const expectCaller = testingToken(.caller_minus, 3, 4);
+    const expectF = mockToken(.marker_f_open, 0, 2);
+    const expectCaller = mockToken(.caller_minus, 3, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1312,8 +1213,8 @@ test "expect - caller after \\f" {
 
 test "expect character caller after \\f" {
     const string: [:0]const u8 = "\\f b";
-    const expectF = testingToken(.marker_f_open, 0, 2);
-    const expectCaller = testingToken(.caller_character, 3, 4);
+    const expectF = mockToken(.marker_f_open, 0, 2);
+    const expectCaller = mockToken(.caller_character, 3, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1326,8 +1227,8 @@ test "expect character caller after \\f" {
 
 test "expect number after \\c" {
     const string: [:0]const u8 = "\\c 1";
-    const expectC = testingToken(.marker_c, 0, 2);
-    const expectNumber = testingToken(.number, 3, 4);
+    const expectC = mockToken(.marker_c, 0, 2);
+    const expectNumber = mockToken(.number, 3, 4);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
@@ -1340,7 +1241,7 @@ test "expect number after \\c" {
 
 test "expect text" {
     const string: [:0]const u8 = "In the beginning...";
-    const expect = testingToken(.text, 0, 19);
+    const expect = mockToken(.text, 0, 19);
 
     var tzr: Tokenizer = Tokenizer.init(string);
 
