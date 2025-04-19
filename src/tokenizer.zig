@@ -11,9 +11,12 @@ pub const Token = struct {
     };
 
     pub const Tag = enum {
+        stub,
         invalid,
         eof,
         text,
+        separator_pipe,
+        separator_colon,
         caller_plus,
         caller_minus,
         caller_character,
@@ -659,7 +662,7 @@ pub const Tokenizer = struct {
 
     pub fn next(self: *Tokenizer) Token {
         var result: Token = .{
-            .tag = undefined,
+            .tag = .stub,
             .loc = .{
                 .start = self.index,
                 .end = undefined,
@@ -681,22 +684,30 @@ pub const Tokenizer = struct {
                     continue :state .start;
                 },
                 '\\' => {
-                    result.loc.start = self.index;
-                    self.index += 1;
                     result.tag = .marker_backslash;
+                    self.index += 1;
                     self.state = .marker_first;
                     break :state;
                 },
                 '~' => {
                     result.tag = .tilde;
-                    result.loc.start = self.index;
                     self.index += 1;
                     break :state;
                 },
                 '/' => continue :state .forwardslash_found,
-                else => {
+                '|' => {
+                    result.tag = .separator_pipe;
                     self.index += 1;
+                    break :state;
+                },
+                ':' => {
+                    result.tag = .separator_colon;
+                    self.index += 1;
+                    break :state;
+                },
+                else => {
                     result.tag = .text;
+                    self.index += 1;
                     continue :state .search_until_not_text;
                 },
             },
@@ -747,7 +758,18 @@ pub const Tokenizer = struct {
                 if (result.tag != .marker_z) {
                     result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start..self.index]) orelse .marker_invalid;
                 }
-                self.state = .marker_last;
+                switch (result.tag) {
+                    .marker_id => self.state = .look_for_book_code,
+                    .marker_sts,
+                    .marker_c,
+                    .marker_ca,
+                    .marker_v,
+                    .marker_va,
+                    => {
+                        self.state = .look_for_number;
+                    },
+                    else => self.state = .marker_last,
+                }
                 break :state;
             },
             .marker_last => {
@@ -857,6 +879,10 @@ pub const Tokenizer = struct {
                         result.loc.start = self.index;
                         continue :state .look_for_number;
                     },
+                    '*' => {
+                        self.state = .marker_last;
+                        break :state;
+                    },
                     '0'...'9' => {
                         result.tag = .number;
                         self.index += 1;
@@ -905,7 +931,7 @@ pub const Tokenizer = struct {
             .search_until_not_text => {
                 // TODO: redo this so that the / marker is handled correctly
                 switch (self.buffer[self.index]) {
-                    0, '\\', '~', '/', '\r', '\n' => {
+                    0, '\\', '~', '/', '\r', '\n', '|', ':' => {
                         break :state;
                     },
                     else => {
