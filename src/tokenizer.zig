@@ -138,10 +138,10 @@ pub const Token = struct {
         marker_fm,
         /// CROSS REFERENCE Markers
         marker_x,
-        marker_xo,
+        marker_xo, // TODO: Parse the origin reference.
         marker_xk,
         marker_xq,
-        marker_xt,
+        marker_xt, // TODO: Parse references.
         marker_xta,
         marker_xop,
         marker_xot,
@@ -768,6 +768,9 @@ pub const Tokenizer = struct {
                     => {
                         self.state = .look_for_number;
                     },
+                    .marker_f, .marker_x => {
+                        self.state = .look_for_caller;
+                    },
                     else => self.state = .marker_last,
                 }
                 break :state;
@@ -853,6 +856,10 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         result.loc.start = self.index;
                         continue :state .look_for_caller;
+                    },
+                    '*' => {
+                        self.state = .marker_last;
+                        break :state;
                     },
                     '+' => {
                         result.tag = .caller_plus;
