@@ -66,10 +66,10 @@ pub const Token = struct {
         marker_msN,
         marker_mr,
         marker_sN,
-        marker_sr,
-        marker_r,
+        marker_sr, // TODO: parse section reference range.
+        marker_r, // TODO: parse parallel passage references.
         /// also a cross-reference marker
-        marker_rq,
+        marker_rq, // TODO: Parse inline qutation references.
         marker_d,
         marker_sp,
         marker_sdN,
