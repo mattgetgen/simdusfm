@@ -5,9 +5,9 @@ const Token = tkn.Token;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const source = @embedFile("usfm/HPUX.usfm");
-var fixed_buffer_mem: [10 * 1024 * 1024]u8 = undefined;
+var fixed_buffer_mem: [100 * 1024 * 1024]u8 = undefined;
 
-fn tokenizeAll(allocator: std.mem.Allocator, input: [:0]const u8) !std.ArrayList(Token).Slice {
+fn tokenizeAll(allocator: std.mem.Allocator, input: [:0]const u8) !void {
     var tokenizer = Tokenizer.init(input);
 
     var tokens = std.ArrayList(Token).init(allocator);
@@ -17,13 +17,12 @@ fn tokenizeAll(allocator: std.mem.Allocator, input: [:0]const u8) !std.ArrayList
         eof = token.tag == .eof;
         try tokens.append(token);
     }
-    return tokens.toOwnedSlice();
 }
 
 fn testOnce() !usize {
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
-    _ = try tokenizeAll(allocator, source);
+    try tokenizeAll(allocator, source);
     return fixed_buffer_alloc.end_index;
 }
 
