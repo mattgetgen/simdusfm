@@ -1,5 +1,5 @@
 const std = @import("std");
-const tkn = @import("dumb_tokenizer.zig");
+const tkn = @import("ideal_tokenizer.zig");
 const Tokenizer = tkn.Tokenizer;
 const Token = tkn.Token;
 

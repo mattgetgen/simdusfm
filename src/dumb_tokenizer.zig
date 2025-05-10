@@ -1,5 +1,4 @@
 const std = @import("std");
-// const StaticStringMap = std.static_string_map.StaticStringMap;
 
 pub const Token = struct {
     tag: Tag,
@@ -11,20 +10,20 @@ pub const Token = struct {
     };
 
     pub const Tag = enum {
-        stub,
+        eof,
         invalid,
         newline,
-        eof,
         forwardslash,
         backslash,
         pipe,
         colon,
         semicolon,
         tilde,
-        asterisk, // TODO: figure out what this character is actually called
+        asterisk,
         plus,
         minus,
         equal,
+        double_quote,
         number,
         text,
     };
@@ -52,14 +51,15 @@ pub const Tokenizer = struct {
         search_until_not_number,
         search_until_not_text,
         invalid_found,
+        end,
     };
 
     pub fn next(self: *Tokenizer) Token {
         var result: Token = .{
-            .tag = .stub,
+            .tag = .invalid,
             .loc = .{
                 .start = self.index,
-                .end = undefined,
+                .end = self.index,
             },
         };
         state: switch (State.start) {
@@ -85,58 +85,63 @@ pub const Tokenizer = struct {
                 '\n' => {
                     result.tag = .newline;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 // single-character tokens
                 '/' => {
                     result.tag = .forwardslash;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '\\' => {
                     result.tag = .backslash;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '|' => {
                     result.tag = .pipe;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 ':' => {
                     result.tag = .colon;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 ';' => {
                     result.tag = .semicolon;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '~' => {
                     result.tag = .tilde;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '*' => {
                     result.tag = .asterisk;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '+' => {
                     result.tag = .plus;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '-' => {
                     result.tag = .minus;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 '=' => {
                     result.tag = .equal;
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
+                },
+                '"' => {
+                    result.tag = .double_quote;
+                    self.index += 1;
+                    continue :state .end;
                 },
                 '0'...'9' => {
                     result.tag = .number;
@@ -152,7 +157,7 @@ pub const Tokenizer = struct {
             .ensure_carriage_return => switch (self.buffer[self.index]) {
                 '\n' => {
                     self.index += 1;
-                    break :state;
+                    continue :state .end;
                 },
                 else => continue :state .invalid_found,
             },
@@ -161,12 +166,12 @@ pub const Tokenizer = struct {
                     self.index += 1;
                     continue :state .search_until_not_number;
                 },
-                else => break :state,
+                else => continue :state .end,
             },
             .search_until_not_text => {
                 switch (self.buffer[self.index]) {
-                    0, ' ', '\t', '\r', '\n', '/', '\\', '|', ':', ';', '~', '*', '+', '-', '=', '0'...'9' => {
-                        break :state;
+                    0, '\r', '\n', '/', '\\', '|', ':', ';', '~', '*', '+', '-', '=', '"', '0'...'9' => {
+                        continue :state .end;
                     },
                     else => {
                         self.index += 1;
@@ -177,10 +182,13 @@ pub const Tokenizer = struct {
             .invalid_found => {
                 result.tag = .invalid;
                 self.index += 1;
+                continue :state .end;
+            },
+            .end => {
+                result.loc.end = self.index;
                 break :state;
             },
         }
-        result.loc.end = self.index;
         return result;
     }
 };

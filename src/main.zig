@@ -2,21 +2,26 @@ const std = @import("std");
 const tkn = @import("dumb_tokenizer.zig");
 const Tokenizer = tkn.Tokenizer;
 const Token = tkn.Token;
-const Parser = @import("dumb_parser.zig");
-const testByIterations = @import("perf_test.zig").testByIterations;
+const Parser = @import("parser.zig");
+const testByIterations = @import("token_perf_test.zig").testByIterations;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const dirpath = "/home/mgetgen/repos/example_usfm/HPUX/";
 
 pub fn main() !void {
+    // try run_std_test();
+    try testByIterations();
+}
+
+fn run_std_test() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer _ = arena.deinit();
 
-    // const allocator = gpa.allocator();
-    const allocator = arena.allocator();
+    const allocator = gpa.allocator();
+    // const allocator = arena.allocator();
 
     var dir = try std.fs.openDirAbsolute(dirpath, .{
         .access_sub_paths = false,
@@ -48,7 +53,7 @@ pub fn main() !void {
 
         const data: [:0]const u8 = try file.readToEndAllocOptions(allocator, std.math.maxInt(u32), size, @alignOf(u8), 0);
         try file_bytes.append(data);
-        // break;
+        break;
     }
 
     var timer = try std.time.Timer.start();
@@ -127,61 +132,6 @@ pub fn main() !void {
     std.debug.print("tokenized {:.2} into {d} tokens\n", .{ fmtIntSizeBin(total_size), total_tokens });
     std.debug.print("noop speed: {:.2}/s\n", .{fmtIntSizeBin(noop_bps)});
     std.debug.print("parsing speed: {:.2}/s\n", .{fmtIntSizeBin(bps)});
-}
-
-fn print_all_debug(tokenizer: Tokenizer, tokens: []Token) void {
-    var t: usize = 0;
-    var t_start: usize = tokens[t].loc.start;
-    var t_end: usize = tokens[t].loc.end;
-    var sep_char: u8 = ' ';
-    var print_tag_name: bool = false;
-    for (tokenizer.buffer, 0..) |byte, i| {
-        print_tag_name = false;
-        if (i >= t_end) {
-            t += 1;
-            t_start = tokens[t].loc.start;
-            t_end = tokens[t].loc.end;
-        }
-        if (i < t_start) {
-            sep_char = ' ';
-        } else if (i == t_start) {
-            print_tag_name = true;
-        } else if (i == t_end - 1) {
-            sep_char = '/';
-        } else {
-            sep_char = '|';
-        }
-        switch (byte) {
-            '\t' => {
-                if (print_tag_name) {
-                    std.debug.print("\\t\t{s}\n", .{@tagName(tokens[t].tag)});
-                } else {
-                    std.debug.print("\\t\t{c}\n", .{sep_char});
-                }
-            },
-            '\r' => {
-                if (print_tag_name) {
-                    std.debug.print("\\r\t{s}\n", .{@tagName(tokens[t].tag)});
-                } else {
-                    std.debug.print("\\r\t{c}\n", .{sep_char});
-                }
-            },
-            '\n' => {
-                if (print_tag_name) {
-                    std.debug.print("\\n\t{s}\n", .{@tagName(tokens[t].tag)});
-                } else {
-                    std.debug.print("\\n\t{c}\n", .{sep_char});
-                }
-            },
-            else => {
-                if (print_tag_name) {
-                    std.debug.print("{c}\t{s}\n", .{ byte, @tagName(tokens[t].tag) });
-                } else {
-                    std.debug.print("{c}\t{c}\n", .{ byte, sep_char });
-                }
-            },
-        }
-    }
 }
 
 fn calc_bps(start: u64, end: u64, total_size: usize) u64 {

@@ -11,9 +11,9 @@ pub const Token = struct {
     };
 
     pub const Tag = enum {
-        stub,
-        invalid,
         eof,
+        invalid,
+        newline,
         text,
         separator_pipe,
         separator_colon,
@@ -662,10 +662,10 @@ pub const Tokenizer = struct {
 
     pub fn next(self: *Tokenizer) Token {
         var result: Token = .{
-            .tag = .stub,
+            .tag = .invalid,
             .loc = .{
                 .start = self.index,
-                .end = undefined,
+                .end = self.index,
             },
         };
         state: switch (self.state) {
