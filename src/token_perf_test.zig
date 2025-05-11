@@ -1,7 +1,10 @@
 const std = @import("std");
-const tkn1 = @import("tokenizer.zig");
-const tkn2 = @import("dumb_tokenizer.zig");
-const tkn3 = @import("ideal_tokenizer.zig");
+const FirstTokenizer = @import("FirstTokenizer.zig");
+const FirstToken = FirstTokenizer.Token;
+const DumbTokenizer = @import("DumbTokenizer.zig");
+const DumbToken = DumbTokenizer.Token;
+const Tokenizer = @import("Tokenizer.zig");
+const Token = Tokenizer.Token;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const source = @embedFile("usfm/HPUX.usfm");
@@ -17,11 +20,11 @@ fn testOnce1() !TestResult {
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
 
-    var tokenizer = tkn1.Tokenizer.init(source);
-    var tokens = std.ArrayList(tkn1.Token).init(allocator);
+    var tokenizer = FirstTokenizer.init(source);
+    var tokens = std.ArrayList(FirstToken).init(allocator);
     var eof = false;
     while (!eof) {
-        const token: tkn1.Token = tokenizer.next();
+        const token: FirstToken = tokenizer.next();
         eof = token.tag == .eof;
         try tokens.append(token);
     }
@@ -36,11 +39,11 @@ fn testOnce2() !TestResult {
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
 
-    var tokenizer = tkn2.Tokenizer.init(source);
-    var tokens = std.ArrayList(tkn2.Token).init(allocator);
+    var tokenizer = DumbTokenizer.init(source);
+    var tokens = std.ArrayList(DumbToken).init(allocator);
     var eof = false;
     while (!eof) {
-        const token: tkn2.Token = tokenizer.next();
+        const token: DumbToken = tokenizer.next();
         eof = token.tag == .eof;
         try tokens.append(token);
     }
@@ -55,11 +58,11 @@ fn testOnce3() !TestResult {
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
 
-    var tokenizer = tkn3.Tokenizer.init(source);
-    var tokens = std.ArrayList(tkn3.Token).init(allocator);
+    var tokenizer = Tokenizer.init(source);
+    var tokens = std.ArrayList(Token).init(allocator);
     var eof = false;
     while (!eof) {
-        const token: tkn3.Token = tokenizer.next();
+        const token: Token = tokenizer.next();
         eof = token.tag == .eof;
         try tokens.append(token);
     }

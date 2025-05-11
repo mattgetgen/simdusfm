@@ -1,6 +1,12 @@
 const std = @import("std");
 const StaticStringMap = std.static_string_map.StaticStringMap;
 
+const FirstTokenizer = @This();
+
+buffer: [:0]const u8,
+index: usize,
+state: State,
+
 pub const Token = struct {
     tag: Tag,
     loc: Loc,
@@ -622,341 +628,335 @@ pub const Token = struct {
     }
 };
 
-pub const Tokenizer = struct {
-    buffer: [:0]const u8,
-    index: usize,
-    state: State,
+/// For debugging purposes.
+pub fn dump(self: *FirstTokenizer, token: *const Token) void {
+    std.debug.print("k: {s}\tv:\"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.loc.start..token.loc.end] });
+}
 
-    /// For debugging purposes.
-    pub fn dump(self: *Tokenizer, token: *const Token) void {
-        std.debug.print("k: {s}\tv:\"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.loc.start..token.loc.end] });
-    }
-
-    pub fn init(buffer: [:0]const u8) Tokenizer {
-        return .{
-            .buffer = buffer,
-            .index = 0,
-            .state = .start,
-        };
-    }
-
-    const State = enum {
-        start,
-        invalid_found,
-        marker_first,
-        marker_characters,
-        marker_check,
-        marker_num,
-        marker_last,
-        marker_s_or_e,
-        invalid_marker_found,
-        look_for_book_code,
-        book_code_found,
-        book_code_check,
-        look_for_caller,
-        look_for_number,
-        number_found,
-        forwardslash_found,
-        search_until_not_text,
+pub fn init(buffer: [:0]const u8) FirstTokenizer {
+    return .{
+        .buffer = buffer,
+        .index = 0,
+        .state = .start,
     };
+}
 
-    pub fn next(self: *Tokenizer) Token {
-        var result: Token = .{
-            .tag = .invalid,
-            .loc = .{
-                .start = self.index,
-                .end = self.index,
+const State = enum {
+    start,
+    invalid_found,
+    marker_first,
+    marker_characters,
+    marker_check,
+    marker_num,
+    marker_last,
+    marker_s_or_e,
+    invalid_marker_found,
+    look_for_book_code,
+    book_code_found,
+    book_code_check,
+    look_for_caller,
+    look_for_number,
+    number_found,
+    forwardslash_found,
+    search_until_not_text,
+};
+
+pub fn next(self: *FirstTokenizer) Token {
+    var result: Token = .{
+        .tag = .invalid,
+        .loc = .{
+            .start = self.index,
+            .end = self.index,
+        },
+    };
+    state: switch (self.state) {
+        .start => switch (self.buffer[self.index]) {
+            0 => {
+                if (self.index == self.buffer.len) {
+                    result.tag = .eof;
+                    break :state;
+                } else {
+                    continue :state .invalid_found;
+                }
             },
-        };
-        state: switch (self.state) {
-            .start => switch (self.buffer[self.index]) {
-                0 => {
-                    if (self.index == self.buffer.len) {
-                        result.tag = .eof;
-                        break :state;
-                    } else {
-                        continue :state .invalid_found;
-                    }
-                },
-                ' ', '\t', '\r', '\n' => {
+            ' ', '\t', '\r', '\n' => {
+                self.index += 1;
+                result.loc.start = self.index;
+                continue :state .start;
+            },
+            '\\' => {
+                result.tag = .marker_backslash;
+                self.index += 1;
+                self.state = .marker_first;
+                break :state;
+            },
+            '~' => {
+                result.tag = .tilde;
+                self.index += 1;
+                break :state;
+            },
+            '/' => continue :state .forwardslash_found,
+            '|' => {
+                result.tag = .separator_pipe;
+                self.index += 1;
+                break :state;
+            },
+            ':' => {
+                result.tag = .separator_colon;
+                self.index += 1;
+                break :state;
+            },
+            else => {
+                result.tag = .text;
+                self.index += 1;
+                continue :state .search_until_not_text;
+            },
+        },
+        .marker_first => {
+            self.state = .start;
+            switch (self.buffer[self.index]) {
+                // no marker starts with 'g' or 'y'
+                'a'...'f', 'h'...'x' => {
                     self.index += 1;
-                    result.loc.start = self.index;
-                    continue :state .start;
+                    continue :state .marker_characters;
                 },
-                '\\' => {
-                    result.tag = .marker_backslash;
+                // z is only found in the extra 'z' marker
+                'z' => {
+                    result.tag = .marker_z;
                     self.index += 1;
-                    self.state = .marker_first;
+                    continue :state .marker_characters;
+                },
+                '+' => {
+                    result.tag = .marker_nested;
+                    self.index += 1;
+                    self.state = .marker_characters;
                     break :state;
                 },
-                '~' => {
-                    result.tag = .tilde;
-                    self.index += 1;
-                    break :state;
-                },
-                '/' => continue :state .forwardslash_found,
-                '|' => {
-                    result.tag = .separator_pipe;
-                    self.index += 1;
-                    break :state;
-                },
-                ':' => {
-                    result.tag = .separator_colon;
+                '*' => {
+                    result.tag = .marker_close;
                     self.index += 1;
                     break :state;
                 },
                 else => {
-                    result.tag = .text;
+                    self.index += 1;
+                    continue :state .invalid_marker_found;
+                },
+            }
+        },
+        .marker_characters => {
+            self.state = .start;
+            switch (self.buffer[self.index]) {
+                'a'...'z' => {
+                    self.index += 1;
+                    continue :state .marker_characters;
+                },
+                else => {
+                    continue :state .marker_check;
+                },
+            }
+        },
+        .marker_check => {
+            if (result.tag != .marker_z) {
+                result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start..self.index]) orelse .marker_invalid;
+            }
+            switch (result.tag) {
+                .marker_id => self.state = .look_for_book_code,
+                .marker_sts,
+                .marker_c,
+                .marker_ca,
+                .marker_v,
+                .marker_va,
+                => {
+                    self.state = .look_for_number;
+                },
+                .marker_f, .marker_x => {
+                    self.state = .look_for_caller;
+                },
+                else => self.state = .marker_last,
+            }
+            break :state;
+        },
+        .marker_last => {
+            self.state = .start;
+            // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
+            switch (self.buffer[self.index]) {
+                '*' => {
+                    self.index += 1;
+                    result.tag = .marker_close;
+                    break :state;
+                },
+                '0'...'9' => {
+                    self.index += 1;
+                    result.tag = .marker_number;
+                    continue :state .marker_num;
+                },
+                '-' => {
+                    self.index += 1;
+                    continue :state .marker_s_or_e;
+                },
+                else => {
+                    continue :state .start;
+                },
+            }
+        },
+        .marker_num => {
+            num: switch (self.buffer[self.index]) {
+                '0'...'9' => {
+                    self.index += 1;
+                    continue :num self.buffer[self.index];
+                },
+                else => {
+                    self.state = .marker_last;
+                    break :state;
+                },
+            }
+        },
+        .marker_s_or_e => {
+            switch (self.buffer[self.index]) {
+                's' => {
+                    result.tag = .marker_start;
+                    self.index += 1;
+                    break :state;
+                },
+                'e' => {
+                    result.tag = .marker_end;
+                    self.index += 1;
+                    break :state;
+                },
+                else => {
+                    self.index += 1;
+                    continue :state .invalid_found;
+                },
+            }
+        },
+        .invalid_marker_found => {
+            result.tag = .marker_invalid;
+            // self.index += 1;
+            // std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
+            break :state;
+        },
+        .look_for_book_code => {
+            self.state = .start;
+            switch (self.buffer[self.index]) {
+                ' ', '\t', '\r', '\n' => {
+                    self.index += 1;
+                    result.loc.start = self.index;
+                    continue :state .look_for_book_code;
+                },
+                'A'...'Z', '1'...'6' => {
+                    self.index += 1;
+                    continue :state .book_code_found;
+                },
+                else => break :state,
+            }
+        },
+        .look_for_caller => {
+            self.state = .start;
+            switch (self.buffer[self.index]) {
+                ' ', '\t', '\r', '\n' => {
+                    self.index += 1;
+                    result.loc.start = self.index;
+                    continue :state .look_for_caller;
+                },
+                '*' => {
+                    self.state = .marker_last;
+                    break :state;
+                },
+                '+' => {
+                    result.tag = .caller_plus;
+                },
+                '-' => {
+                    result.tag = .caller_minus;
+                },
+                'a'...'z' => {
+                    result.tag = .caller_character;
+                },
+                else => {
+                    // std.debug.print("Unknown caller found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
+                    break :state;
+                },
+            }
+            self.index += 1;
+            break :state;
+        },
+        .look_for_number => {
+            self.state = .start;
+            switch (self.buffer[self.index]) {
+                ' ', '\t', '\r', '\n' => {
+                    self.index += 1;
+                    result.loc.start = self.index;
+                    continue :state .look_for_number;
+                },
+                '*' => {
+                    self.state = .marker_last;
+                    break :state;
+                },
+                '0'...'9' => {
+                    result.tag = .number;
+                    self.index += 1;
+                    continue :state .number_found;
+                },
+                else => break :state,
+            }
+        },
+        .book_code_found => {
+            switch (self.buffer[self.index]) {
+                'A'...'Z', '1'...'6' => {
+                    self.index += 1;
+                    continue :state .book_code_found;
+                },
+                else => continue :state .book_code_check,
+            }
+        },
+        .number_found => {
+            switch (self.buffer[self.index]) {
+                '0'...'9' => {
+                    result.tag = .number;
+                    self.index += 1;
+                    continue :state .number_found;
+                },
+                else => break :state,
+            }
+        },
+        .book_code_check => {
+            result.tag = Token.getBookCode(self.buffer[result.loc.start..self.index]) orelse .invalid_book_code;
+            break :state;
+        },
+        .forwardslash_found => {
+            self.index += 1;
+            switch (self.buffer[self.index]) {
+                '/' => {
+                    result.tag = .line_break;
+                    self.index += 1;
+                    break :state;
+                },
+                else => {
+                    self.index -= 1;
+                    continue :state .invalid_found;
+                },
+            }
+        },
+        .search_until_not_text => {
+            // TODO: redo this so that the / marker is handled correctly
+            switch (self.buffer[self.index]) {
+                0, '\\', '~', '/', '\r', '\n', '|', ':' => {
+                    break :state;
+                },
+                else => {
                     self.index += 1;
                     continue :state .search_until_not_text;
                 },
-            },
-            .marker_first => {
-                self.state = .start;
-                switch (self.buffer[self.index]) {
-                    // no marker starts with 'g' or 'y'
-                    'a'...'f', 'h'...'x' => {
-                        self.index += 1;
-                        continue :state .marker_characters;
-                    },
-                    // z is only found in the extra 'z' marker
-                    'z' => {
-                        result.tag = .marker_z;
-                        self.index += 1;
-                        continue :state .marker_characters;
-                    },
-                    '+' => {
-                        result.tag = .marker_nested;
-                        self.index += 1;
-                        self.state = .marker_characters;
-                        break :state;
-                    },
-                    '*' => {
-                        result.tag = .marker_close;
-                        self.index += 1;
-                        break :state;
-                    },
-                    else => {
-                        self.index += 1;
-                        continue :state .invalid_marker_found;
-                    },
-                }
-            },
-            .marker_characters => {
-                self.state = .start;
-                switch (self.buffer[self.index]) {
-                    'a'...'z' => {
-                        self.index += 1;
-                        continue :state .marker_characters;
-                    },
-                    else => {
-                        continue :state .marker_check;
-                    },
-                }
-            },
-            .marker_check => {
-                if (result.tag != .marker_z) {
-                    result.tag = Token.getMarkerIdentifier(self.buffer[result.loc.start..self.index]) orelse .marker_invalid;
-                }
-                switch (result.tag) {
-                    .marker_id => self.state = .look_for_book_code,
-                    .marker_sts,
-                    .marker_c,
-                    .marker_ca,
-                    .marker_v,
-                    .marker_va,
-                    => {
-                        self.state = .look_for_number;
-                    },
-                    .marker_f, .marker_x => {
-                        self.state = .look_for_caller;
-                    },
-                    else => self.state = .marker_last,
-                }
-                break :state;
-            },
-            .marker_last => {
-                self.state = .start;
-                // HERE BE NUMBERS, *, -s or -e, whitespace, or other.
-                switch (self.buffer[self.index]) {
-                    '*' => {
-                        self.index += 1;
-                        result.tag = .marker_close;
-                        break :state;
-                    },
-                    '0'...'9' => {
-                        self.index += 1;
-                        result.tag = .marker_number;
-                        continue :state .marker_num;
-                    },
-                    '-' => {
-                        self.index += 1;
-                        continue :state .marker_s_or_e;
-                    },
-                    else => {
-                        continue :state .start;
-                    },
-                }
-            },
-            .marker_num => {
-                num: switch (self.buffer[self.index]) {
-                    '0'...'9' => {
-                        self.index += 1;
-                        continue :num self.buffer[self.index];
-                    },
-                    else => {
-                        self.state = .marker_last;
-                        break :state;
-                    },
-                }
-            },
-            .marker_s_or_e => {
-                switch (self.buffer[self.index]) {
-                    's' => {
-                        result.tag = .marker_start;
-                        self.index += 1;
-                        break :state;
-                    },
-                    'e' => {
-                        result.tag = .marker_end;
-                        self.index += 1;
-                        break :state;
-                    },
-                    else => {
-                        self.index += 1;
-                        continue :state .invalid_found;
-                    },
-                }
-            },
-            .invalid_marker_found => {
-                result.tag = .marker_invalid;
-                // self.index += 1;
-                // std.debug.print("Unknown marker found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
-                break :state;
-            },
-            .look_for_book_code => {
-                self.state = .start;
-                switch (self.buffer[self.index]) {
-                    ' ', '\t', '\r', '\n' => {
-                        self.index += 1;
-                        result.loc.start = self.index;
-                        continue :state .look_for_book_code;
-                    },
-                    'A'...'Z', '1'...'6' => {
-                        self.index += 1;
-                        continue :state .book_code_found;
-                    },
-                    else => break :state,
-                }
-            },
-            .look_for_caller => {
-                self.state = .start;
-                switch (self.buffer[self.index]) {
-                    ' ', '\t', '\r', '\n' => {
-                        self.index += 1;
-                        result.loc.start = self.index;
-                        continue :state .look_for_caller;
-                    },
-                    '*' => {
-                        self.state = .marker_last;
-                        break :state;
-                    },
-                    '+' => {
-                        result.tag = .caller_plus;
-                    },
-                    '-' => {
-                        result.tag = .caller_minus;
-                    },
-                    'a'...'z' => {
-                        result.tag = .caller_character;
-                    },
-                    else => {
-                        // std.debug.print("Unknown caller found: {s} @ {d}\n", .{ self.buffer[result.loc.start..self.index], result.loc.start });
-                        break :state;
-                    },
-                }
-                self.index += 1;
-                break :state;
-            },
-            .look_for_number => {
-                self.state = .start;
-                switch (self.buffer[self.index]) {
-                    ' ', '\t', '\r', '\n' => {
-                        self.index += 1;
-                        result.loc.start = self.index;
-                        continue :state .look_for_number;
-                    },
-                    '*' => {
-                        self.state = .marker_last;
-                        break :state;
-                    },
-                    '0'...'9' => {
-                        result.tag = .number;
-                        self.index += 1;
-                        continue :state .number_found;
-                    },
-                    else => break :state,
-                }
-            },
-            .book_code_found => {
-                switch (self.buffer[self.index]) {
-                    'A'...'Z', '1'...'6' => {
-                        self.index += 1;
-                        continue :state .book_code_found;
-                    },
-                    else => continue :state .book_code_check,
-                }
-            },
-            .number_found => {
-                switch (self.buffer[self.index]) {
-                    '0'...'9' => {
-                        result.tag = .number;
-                        self.index += 1;
-                        continue :state .number_found;
-                    },
-                    else => break :state,
-                }
-            },
-            .book_code_check => {
-                result.tag = Token.getBookCode(self.buffer[result.loc.start..self.index]) orelse .invalid_book_code;
-                break :state;
-            },
-            .forwardslash_found => {
-                self.index += 1;
-                switch (self.buffer[self.index]) {
-                    '/' => {
-                        result.tag = .line_break;
-                        self.index += 1;
-                        break :state;
-                    },
-                    else => {
-                        self.index -= 1;
-                        continue :state .invalid_found;
-                    },
-                }
-            },
-            .search_until_not_text => {
-                // TODO: redo this so that the / marker is handled correctly
-                switch (self.buffer[self.index]) {
-                    0, '\\', '~', '/', '\r', '\n', '|', ':' => {
-                        break :state;
-                    },
-                    else => {
-                        self.index += 1;
-                        continue :state .search_until_not_text;
-                    },
-                }
-            },
-            .invalid_found => {
-                result.tag = .invalid;
-                self.index += 1;
-                break :state;
-            },
-        }
-        result.loc.end = self.index;
-        return result;
+            }
+        },
+        .invalid_found => {
+            result.tag = .invalid;
+            self.index += 1;
+            break :state;
+        },
     }
-};
+    result.loc.end = self.index;
+    return result;
+}
 
 fn mockToken(tag: Token.Tag, start: usize, end: usize) Token {
     return .{
@@ -972,7 +972,7 @@ test "expect eof from empty" {
     const string: [:0]const u8 = "";
     const expect = mockToken(.eof, 0, 0);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -982,7 +982,7 @@ test "skips whitespace" {
     const string: [:0]const u8 = " \t\r\n";
     const expect = mockToken(.eof, 4, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -992,7 +992,7 @@ test "expect tilde" {
     const string: [:0]const u8 = "~";
     const expect = mockToken(.tilde, 0, 1);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -1002,7 +1002,7 @@ test "expect line break" {
     const string: [:0]const u8 = "//";
     const expect = mockToken(.line_break, 0, 2);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -1012,7 +1012,7 @@ test "expect invalid marker" {
     const string: [:0]const u8 = "\\beef";
     const expect = mockToken(.marker_invalid, 0, 5);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -1022,7 +1022,7 @@ test "expect invalid marker with y" {
     const string: [:0]const u8 = "\\yak";
     const expect = mockToken(.marker_invalid, 0, 2);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -1032,7 +1032,7 @@ test "expect \\id marker" {
     const string: [:0]const u8 = "\\id";
     const expect = mockToken(.marker_id, 0, 3);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
     const token: Token = tzr.next();
 
     try std.testing.expectEqual(expect, token);
@@ -1043,7 +1043,7 @@ test "expect \\id marker followed by a valid book code" {
     const expectId = mockToken(.marker_id, 0, 3);
     const expectBook = mockToken(.book_GEN, 4, 7);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectId, token);
@@ -1057,7 +1057,7 @@ test "expect \\id marker followed by an invalid book code" {
     const expectId = mockToken(.marker_id, 0, 3);
     const expectBook = mockToken(.invalid_book_code, 4, 7);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectId, token);
@@ -1070,7 +1070,7 @@ test "expect \\h without a number after" {
     const string: [:0]const u8 = "\\h";
     const expect = mockToken(.marker_hN, 0, 2);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1080,7 +1080,7 @@ test "expect \\h with a number after" {
     const string: [:0]const u8 = "\\h1";
     const expect = mockToken(.marker_hN, 0, 3);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1090,7 +1090,7 @@ test "expect \\h with a long number after" {
     const string: [:0]const u8 = "\\h11111111";
     const expect = mockToken(.marker_hN, 0, 10);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1100,7 +1100,7 @@ test "expect \\liv without a number" {
     const string: [:0]const u8 = "\\liv";
     const expect = mockToken(.marker_livN_open, 0, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1110,7 +1110,7 @@ test "expect \\liv* without a number" {
     const string: [:0]const u8 = "\\liv*";
     const expect = mockToken(.marker_livN_close, 0, 5);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1120,7 +1120,7 @@ test "expect \\livN" {
     const string: [:0]const u8 = "\\liv5";
     const expect = mockToken(.marker_livN_open, 0, 5);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1130,7 +1130,7 @@ test "expect \\livN*" {
     const string: [:0]const u8 = "\\liv5*";
     const expect = mockToken(.marker_livN_close, 0, 6);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1140,7 +1140,7 @@ test "expect \\ts without -s or -e" {
     const string: [:0]const u8 = "\\ts";
     const expect = mockToken(.marker_ts, 0, 3);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1150,7 +1150,7 @@ test "expect \\ts with -s" {
     const string: [:0]const u8 = "\\ts-s";
     const expect = mockToken(.marker_ts_s, 0, 5);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1160,7 +1160,7 @@ test "expect \\ts with -e" {
     const string: [:0]const u8 = "\\ts-e";
     const expect = mockToken(.marker_ts_e, 0, 5);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1170,7 +1170,7 @@ test "expect \\qt without -s or -e or number" {
     const string: [:0]const u8 = "\\qt";
     const expect = mockToken(.marker_qtN, 0, 3);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1180,7 +1180,7 @@ test "expect \\qt without -s or -e but with a number" {
     const string: [:0]const u8 = "\\qt1";
     const expect = mockToken(.marker_qtN, 0, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1190,7 +1190,7 @@ test "expect \\qt with -s and a number" {
     const string: [:0]const u8 = "\\qt1-s";
     const expect = mockToken(.marker_qtN_s, 0, 6);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1200,7 +1200,7 @@ test "expect \\qt with -e but and a number" {
     const string: [:0]const u8 = "\\qt1-e";
     const expect = mockToken(.marker_qtN_e, 0, 6);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1210,7 +1210,7 @@ test "expect \\wj*" {
     const string: [:0]const u8 = "\\wj*";
     const expect = mockToken(.marker_wj_close, 0, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);
@@ -1221,7 +1221,7 @@ test "expect + caller after \\f" {
     const expectF = mockToken(.marker_f_open, 0, 2);
     const expectCaller = mockToken(.caller_plus, 3, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectF, token);
@@ -1235,7 +1235,7 @@ test "expect - caller after \\f" {
     const expectF = mockToken(.marker_f_open, 0, 2);
     const expectCaller = mockToken(.caller_minus, 3, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectF, token);
@@ -1249,7 +1249,7 @@ test "expect character caller after \\f" {
     const expectF = mockToken(.marker_f_open, 0, 2);
     const expectCaller = mockToken(.caller_character, 3, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectF, token);
@@ -1263,7 +1263,7 @@ test "expect number after \\c" {
     const expectC = mockToken(.marker_c, 0, 2);
     const expectNumber = mockToken(.number, 3, 4);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     var token: Token = tzr.next();
     try std.testing.expectEqual(expectC, token);
@@ -1276,7 +1276,7 @@ test "expect text" {
     const string: [:0]const u8 = "In the beginning...";
     const expect = mockToken(.text, 0, 19);
 
-    var tzr: Tokenizer = Tokenizer.init(string);
+    var tzr = FirstTokenizer.init(string);
 
     const token: Token = tzr.next();
     try std.testing.expectEqual(expect, token);

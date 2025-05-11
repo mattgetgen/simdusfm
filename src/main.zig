@@ -1,27 +1,27 @@
 const std = @import("std");
-const tkn = @import("dumb_tokenizer.zig");
-const Tokenizer = tkn.Tokenizer;
-const Token = tkn.Token;
-const Parser = @import("parser.zig");
+const Tokenizer = @import("Tokenizer.zig");
+const Token = Tokenizer.Token;
+const Parser = @import("Parser.zig");
 const testByIterations = @import("token_perf_test.zig").testByIterations;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const dirpath = "/home/mgetgen/repos/example_usfm/HPUX/";
 
 pub fn main() !void {
-    // try run_std_test();
-    try testByIterations();
+    try run_std_test();
+    // try testByIterations();
 }
 
 fn run_std_test() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    var dbg = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg.deinit();
+    _ = dbg.detectLeaks();
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer _ = arena.deinit();
 
-    const allocator = gpa.allocator();
-    // const allocator = arena.allocator();
+    // const allocator = dbg.allocator();
+    const allocator = arena.allocator();
 
     var dir = try std.fs.openDirAbsolute(dirpath, .{
         .access_sub_paths = false,
@@ -53,7 +53,7 @@ fn run_std_test() !void {
 
         const data: [:0]const u8 = try file.readToEndAllocOptions(allocator, std.math.maxInt(u32), size, @alignOf(u8), 0);
         try file_bytes.append(data);
-        break;
+        // break;
     }
 
     var timer = try std.time.Timer.start();

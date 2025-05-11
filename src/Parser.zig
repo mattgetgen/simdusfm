@@ -1,7 +1,8 @@
 const std = @import("std");
-const tkn = @import("ideal_tokenizer.zig");
-const Tokenizer = tkn.Tokenizer;
-const Token = tkn.Token;
+const Tokenizer = @import("Tokenizer.zig");
+const Token = Tokenizer.Token;
+
+const Parser = @This();
 
 pub fn parse(allocator: std.mem.Allocator, input: [:0]const u8) !usize {
     var tokens = std.ArrayList(Token).init(allocator);
