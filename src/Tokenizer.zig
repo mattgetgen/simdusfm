@@ -32,13 +32,11 @@ pub const Token = struct {
         double_quote,
         number,
         text,
+        comment, // TODO: in the future, don't tokenize comments.
         /// MARKERS
-        marker_string,
-        marker_number,
-        marker_start,
-        marker_end,
         marker_invalid,
-        marker_z_namespace,
+        marker_text,
+        marker_z_text,
     };
 };
 
@@ -61,11 +59,10 @@ const State = enum {
     search_until_not_number,
     search_until_not_text,
     marker_first,
-    marker_capture_string,
+    marker_capture_text,
     marker_last,
-    marker_capture_number,
-    marker_capture_s_or_e,
     tokenize_until_whitespace,
+    skip_until_newline,
     invalid_found,
 };
 
@@ -164,6 +161,11 @@ pub fn next(self: *Tokenizer) Token {
                 self.index += 1;
                 continue :state .search_until_not_text;
             },
+            '#' => {
+                result.tag = .comment;
+                self.index += 1;
+                continue :state .skip_until_newline;
+            },
             else => {
                 result.tag = .text;
                 self.index += 1;
@@ -196,16 +198,15 @@ pub fn next(self: *Tokenizer) Token {
         .marker_first => {
             self.state = .start;
             switch (self.buffer[self.index]) {
-                // no marker starts with 'g' or 'y'
-                'a'...'f', 'h'...'x' => {
-                    result.tag = .marker_string;
+                'a'...'y', 'A'...'Z' => {
+                    result.tag = .marker_text;
                     self.index += 1;
-                    continue :state .marker_capture_string;
+                    continue :state .marker_capture_text;
                 },
                 // Any token that starts with 'z' is a user-generated token type
                 // that can't be parsed here.
                 'z' => {
-                    result.tag = .marker_z_namespace;
+                    result.tag = .marker_z_text;
                     self.index += 1;
                     continue :state .tokenize_until_whitespace;
                 },
@@ -227,39 +228,13 @@ pub fn next(self: *Tokenizer) Token {
                 },
             }
         },
-        .marker_capture_string => switch (self.buffer[self.index]) {
-            'a'...'z' => {
+        .marker_capture_text => switch (self.buffer[self.index]) {
+            'a'...'z', 'A'...'Z', '0'...'9', '-' => {
                 self.index += 1;
-                continue :state .marker_capture_string;
+                continue :state .marker_capture_text;
             },
             else => {
                 self.state = .marker_last;
-                break :state;
-            },
-        },
-        .marker_capture_number => switch (self.buffer[self.index]) {
-            '0'...'9' => {
-                self.index += 1;
-                continue :state .marker_capture_number;
-            },
-            else => {
-                self.state = .marker_last;
-                break :state;
-            },
-        },
-        .marker_capture_s_or_e => switch (self.buffer[self.index]) {
-            's' => {
-                result.tag = .marker_start;
-                self.index += 1;
-                break :state;
-            },
-            'e' => {
-                result.tag = .marker_end;
-                self.index += 1;
-                break :state;
-            },
-            else => {
-                result.tag = .minus;
                 break :state;
             },
         },
@@ -271,15 +246,6 @@ pub fn next(self: *Tokenizer) Token {
                     self.index += 1;
                     break :state;
                 },
-                '0'...'9' => {
-                    result.tag = .marker_number;
-                    self.index += 1;
-                    continue :state .marker_capture_number;
-                },
-                '-' => {
-                    self.index += 1;
-                    continue :state .marker_capture_s_or_e;
-                },
                 else => continue :state .start,
             }
         },
@@ -288,6 +254,15 @@ pub fn next(self: *Tokenizer) Token {
             else => {
                 self.index += 1;
                 continue :state .tokenize_until_whitespace;
+            },
+        },
+        .skip_until_newline => switch (self.buffer[self.index]) {
+            // TODO: switch out these two after ensuring comments are correct.
+            // '\r', '\n' => continue :state .start,
+            '\r', '\n' => break :state,
+            else => {
+                self.index += 1;
+                continue :state .skip_until_newline;
             },
         },
         .invalid_found => {

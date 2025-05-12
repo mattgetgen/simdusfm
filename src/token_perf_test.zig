@@ -76,7 +76,7 @@ pub fn testByIterations() !void {
     std.debug.print("file size: {:.2}\n", .{fmtIntSizeBin(source.len)});
     const iteration_list = [_]u16{ 1, 10, 100 };
 
-    std.debug.print("\n## Tokenizer 1 ##\n", .{});
+    std.debug.print("\n## First Tokenizer ##\n", .{});
     for (iteration_list) |iterations| {
         var i: usize = 0;
         var timer = try std.time.Timer.start();
@@ -93,7 +93,7 @@ pub fn testByIterations() !void {
         print_result(iterations, start, end, memory_used, tokens_created);
     }
 
-    std.debug.print("\n## Tokenizer 2 ##\n", .{});
+    std.debug.print("\n## Dumb Tokenizer ##\n", .{});
     for (iteration_list) |iterations| {
         var i: usize = 0;
         var timer = try std.time.Timer.start();
@@ -110,7 +110,7 @@ pub fn testByIterations() !void {
         print_result(iterations, start, end, memory_used, tokens_created);
     }
 
-    std.debug.print("\n## Tokenizer 2 ##\n", .{});
+    std.debug.print("\n## Tokenizer ##\n", .{});
     for (iteration_list) |iterations| {
         var i: usize = 0;
         var timer = try std.time.Timer.start();
