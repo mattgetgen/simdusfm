@@ -628,6 +628,8 @@ pub const Token = struct {
     }
 };
 
+pub const TokenResult = std.ArrayList(Token);
+
 /// For debugging purposes.
 pub fn dump(self: *FirstTokenizer, token: *const Token) void {
     std.debug.print("k: {s}\tv:\"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.loc.start..token.loc.end] });
@@ -639,6 +641,18 @@ pub fn init(buffer: [:0]const u8) FirstTokenizer {
         .index = 0,
         .state = .start,
     };
+}
+
+pub fn tokenize(self: *FirstTokenizer, allocator: std.mem.Allocator) !TokenResult {
+    var result = TokenResult.init(allocator);
+
+    var eof = false;
+    while (!eof) {
+        const token = self.next();
+        try result.append(token);
+        eof = token.tag == .eof;
+    }
+    return result;
 }
 
 const State = enum {
@@ -661,7 +675,7 @@ const State = enum {
     search_until_not_text,
 };
 
-pub fn next(self: *FirstTokenizer) Token {
+fn next(self: *FirstTokenizer) Token {
     var result: Token = .{
         .tag = .invalid,
         .loc = .{

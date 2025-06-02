@@ -21,13 +21,7 @@ fn testOnce1() !TestResult {
     const allocator = fixed_buffer_alloc.allocator();
 
     var tokenizer = FirstTokenizer.init(source);
-    var tokens = std.ArrayList(FirstToken).init(allocator);
-    var eof = false;
-    while (!eof) {
-        const token: FirstToken = tokenizer.next();
-        eof = token.tag == .eof;
-        try tokens.append(token);
-    }
+    const tokens = try tokenizer.tokenize(allocator);
 
     result.token_count = tokens.items.len;
     result.memory_usage = fixed_buffer_alloc.end_index;
@@ -40,13 +34,7 @@ fn testOnce2() !TestResult {
     const allocator = fixed_buffer_alloc.allocator();
 
     var tokenizer = DumbTokenizer.init(source);
-    var tokens = std.ArrayList(DumbToken).init(allocator);
-    var eof = false;
-    while (!eof) {
-        const token: DumbToken = tokenizer.next();
-        eof = token.tag == .eof;
-        try tokens.append(token);
-    }
+    const tokens = try tokenizer.tokenize(allocator);
 
     result.token_count = tokens.items.len;
     result.memory_usage = fixed_buffer_alloc.end_index;
@@ -59,13 +47,7 @@ fn testOnce3() !TestResult {
     const allocator = fixed_buffer_alloc.allocator();
 
     var tokenizer = Tokenizer.init(source);
-    var tokens = std.ArrayList(Token).init(allocator);
-    var eof = false;
-    while (!eof) {
-        const token: Token = tokenizer.next();
-        eof = token.tag == .eof;
-        try tokens.append(token);
-    }
+    const tokens = try tokenizer.tokenize(allocator);
 
     result.token_count = tokens.items.len;
     result.memory_usage = fixed_buffer_alloc.end_index;

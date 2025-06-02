@@ -34,6 +34,8 @@ pub const Token = struct {
     };
 };
 
+pub const TokenResult = std.ArrayList(Token);
+
 /// For debugging purposes.
 pub fn dump(self: *DumbTokenizer, token: *const Token) void {
     std.debug.print("k: {s}\tv:\"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.loc.start..token.loc.end] });
@@ -46,6 +48,18 @@ pub fn init(buffer: [:0]const u8) DumbTokenizer {
     };
 }
 
+pub fn tokenize(self: *DumbTokenizer, allocator: std.mem.Allocator) !TokenResult {
+    var result = TokenResult.init(allocator);
+
+    var eof = false;
+    while (!eof) {
+        const token = self.next();
+        try result.append(token);
+        eof = token.tag == .eof;
+    }
+    return result;
+}
+
 const State = enum {
     start,
     ensure_carriage_return,
@@ -55,7 +69,7 @@ const State = enum {
     end,
 };
 
-pub fn next(self: *DumbTokenizer) Token {
+fn next(self: *DumbTokenizer) Token {
     var result: Token = .{
         .tag = .invalid,
         .loc = .{

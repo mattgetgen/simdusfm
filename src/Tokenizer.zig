@@ -30,15 +30,20 @@ pub const Token = struct {
         minus,
         equal,
         double_quote,
+        // TODO: tokenize line breaks, which look like '//' (two forward slashes)
+        // line_break,
         number,
         text,
         comment, // TODO: in the future, don't tokenize comments.
         /// MARKERS
         marker_invalid,
         marker_text,
+        marker_suffix,
         marker_z_text,
     };
 };
+
+pub const TokenResult = std.ArrayList(Token);
 
 /// For debugging purposes.
 pub fn dump(self: *Tokenizer, token: *const Token) void {
@@ -53,6 +58,18 @@ pub fn init(buffer: [:0]const u8) Tokenizer {
     };
 }
 
+pub fn tokenize(self: *Tokenizer, allocator: std.mem.Allocator) !TokenResult {
+    var result = TokenResult.init(allocator);
+
+    var eof = false;
+    while (!eof) {
+        const token = self.next();
+        try result.append(token);
+        eof = token.tag == .eof;
+    }
+    return result;
+}
+
 const State = enum {
     start,
     ensure_carriage_return,
@@ -60,13 +77,14 @@ const State = enum {
     search_until_not_text,
     marker_first,
     marker_capture_text,
+    marker_capture_suffix,
     marker_last,
     tokenize_until_whitespace,
     skip_until_newline,
     invalid_found,
 };
 
-pub fn next(self: *Tokenizer) Token {
+fn next(self: *Tokenizer) Token {
     var result: Token = .{
         .tag = .invalid,
         .loc = .{
@@ -229,14 +247,33 @@ pub fn next(self: *Tokenizer) Token {
             }
         },
         .marker_capture_text => switch (self.buffer[self.index]) {
-            'a'...'z', 'A'...'Z', '0'...'9', '-' => {
+            'a'...'z', 'A'...'Z', '0'...'9' => {
                 self.index += 1;
                 continue :state .marker_capture_text;
+            },
+            '-' => {
+                self.state = .marker_capture_suffix;
+                break :state;
             },
             else => {
                 self.state = .marker_last;
                 break :state;
             },
+        },
+        .marker_capture_suffix => {
+            self.state = .start;
+            self.index += 1; // we know the first index is a '-'
+            result.tag = .marker_suffix;
+            suffix: switch (self.buffer[self.index]) {
+                'a'...'z', 'A'...'Z', '0'...'9' => {
+                    self.index += 1;
+                    continue :suffix self.buffer[self.index];
+                },
+                else => {
+                    self.state = .marker_last;
+                    break :state;
+                },
+            }
         },
         .marker_last => {
             self.state = .start;

@@ -8,8 +8,8 @@ const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 const dirpath = "/home/mgetgen/repos/example_usfm/HPUX/";
 
 pub fn main() !void {
-    try run_std_test();
-    // try testByIterations();
+    // try run_std_test();
+    try testByIterations();
 }
 
 fn run_std_test() !void {
