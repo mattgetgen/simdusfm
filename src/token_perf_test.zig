@@ -5,6 +5,7 @@ const DumbTokenizer = @import("DumbTokenizer.zig");
 const DumbToken = DumbTokenizer.Token;
 const Tokenizer = @import("Tokenizer.zig");
 const Token = Tokenizer.Token;
+const print = std.debug.print;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const source = @embedFile("usfm/HPUX.usfm");
@@ -13,6 +14,14 @@ var fixed_buffer_mem: [20 * 1024 * 1024]u8 = undefined;
 const TestResult = struct {
     memory_usage: usize,
     token_count: usize,
+    iterations: u16,
+    type: TokenizerType,
+
+    const TokenizerType = enum {
+        First,
+        Dumb,
+        Final,
+    };
 };
 
 fn testOnce1() !TestResult {
@@ -55,71 +64,90 @@ fn testOnce3() !TestResult {
 }
 
 pub fn testByIterations() !void {
-    std.debug.print("file size: {:.2}\n", .{fmtIntSizeBin(source.len)});
+    print("file size: {:.2}\n", .{fmtIntSizeBin(source.len)});
+    print_result_title();
     const iteration_list = [_]u16{ 1, 10, 100 };
 
-    std.debug.print("\n## First Tokenizer ##\n", .{});
+    var test_result: TestResult = .{
+        .memory_usage = 0,
+        .token_count = 0,
+        .iterations = 0,
+        .type = .First,
+    };
     for (iteration_list) |iterations| {
+        test_result.iterations = iterations;
         var i: usize = 0;
         var timer = try std.time.Timer.start();
         const start = timer.lap();
-        var tokens_created: usize = 0;
-        var memory_used: usize = 0;
         while (i < iterations) : (i += 1) {
             const result = try testOnce1();
-            tokens_created += result.token_count;
-            memory_used += result.memory_usage;
+            test_result.memory_usage += result.memory_usage;
+            test_result.token_count += result.token_count;
         }
         const end = timer.read();
 
-        print_result(iterations, start, end, memory_used, tokens_created);
+        print_result(test_result, start, end);
+        test_result.memory_usage = 0;
+        test_result.token_count = 0;
     }
 
-    std.debug.print("\n## Dumb Tokenizer ##\n", .{});
+    test_result = .{
+        .memory_usage = 0,
+        .token_count = 0,
+        .iterations = 0,
+        .type = .Dumb,
+    };
     for (iteration_list) |iterations| {
+        test_result.iterations = iterations;
         var i: usize = 0;
         var timer = try std.time.Timer.start();
         const start = timer.lap();
-        var tokens_created: usize = 0;
-        var memory_used: usize = 0;
         while (i < iterations) : (i += 1) {
             const result = try testOnce2();
-            tokens_created += result.token_count;
-            memory_used += result.memory_usage;
+            test_result.memory_usage += result.memory_usage;
+            test_result.token_count += result.token_count;
         }
         const end = timer.read();
 
-        print_result(iterations, start, end, memory_used, tokens_created);
+        print_result(test_result, start, end);
+        test_result.memory_usage = 0;
+        test_result.token_count = 0;
     }
 
-    std.debug.print("\n## Tokenizer ##\n", .{});
+    test_result = .{
+        .memory_usage = 0,
+        .token_count = 0,
+        .iterations = 0,
+        .type = .Final,
+    };
     for (iteration_list) |iterations| {
+        test_result.iterations = iterations;
         var i: usize = 0;
         var timer = try std.time.Timer.start();
         const start = timer.lap();
-        var tokens_created: usize = 0;
-        var memory_used: usize = 0;
         while (i < iterations) : (i += 1) {
             const result = try testOnce3();
-            tokens_created += result.token_count;
-            memory_used += result.memory_usage;
+            test_result.memory_usage += result.memory_usage;
+            test_result.token_count += result.token_count;
         }
         const end = timer.read();
 
-        print_result(iterations, start, end, memory_used, tokens_created);
+        print_result(test_result, start, end);
+        test_result.memory_usage = 0;
+        test_result.token_count = 0;
     }
 }
 
-fn print_result(iterations: u16, start: u64, end: u64, memory_used: usize, tokens_created: usize) void {
-    const tokens_per_iteration = tokens_created / iterations;
-    const memory_per_iteration = memory_used / iterations;
+fn print_result_title() void {
+    print("Tokenizer\tIterations\tMemory Usage\tToken Count\tTokenization Speed\n", .{});
+}
+
+fn print_result(tr: TestResult, start: u64, end: u64) void {
+    const tokens_per_iteration = tr.token_count / tr.iterations;
+    const memory_per_iteration = tr.memory_usage / tr.iterations;
     const elapsed_s = @as(f64, @floatFromInt(end - start)) / std.time.ns_per_s;
-    const bytes_per_sec_float = @as(f64, @floatFromInt(source.len * iterations)) / elapsed_s;
+    const bytes_per_sec_float = @as(f64, @floatFromInt(source.len * tr.iterations)) / elapsed_s;
     const bytes_per_sec = @as(u64, @intFromFloat(@floor(bytes_per_sec_float)));
 
-    std.debug.print("{d} iterations\n", .{iterations});
-    std.debug.print("tokenization speed: {:.2}/s\n", .{fmtIntSizeBin(bytes_per_sec)});
-    std.debug.print("memory used: {:.2}\n", .{fmtIntSizeBin(memory_per_iteration)});
-    std.debug.print("# tokens created: {d}\n", .{tokens_per_iteration});
-    std.debug.print("\n", .{});
+    print("{s}\t\t{d}\t\t{:.2}\t{d}\t\t{:.2}/s\n", .{ @tagName(tr.type), tr.iterations, fmtIntSizeBin(memory_per_iteration), tokens_per_iteration, fmtIntSizeBin(bytes_per_sec) });
 }
