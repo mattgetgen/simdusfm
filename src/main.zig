@@ -8,8 +8,8 @@ const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 const dirpath = "/home/mgetgen/repos/example_usfm/HPUX/";
 
 pub fn main() !void {
-    // try run_std_test();
-    try testByIterations();
+    try run_std_test();
+    // try testByIterations();
 }
 
 fn run_std_test() !void {
@@ -20,8 +20,8 @@ fn run_std_test() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer _ = arena.deinit();
 
-    // const allocator = dbg.allocator();
-    const allocator = arena.allocator();
+    const allocator = dbg.allocator();
+    // const allocator = arena.allocator();
 
     var dir = try std.fs.openDirAbsolute(dirpath, .{
         .access_sub_paths = false,

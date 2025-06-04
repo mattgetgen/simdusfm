@@ -43,7 +43,29 @@ pub const Token = struct {
     };
 };
 
-pub const TokenResult = std.ArrayList(Token);
+pub const TokenResult = struct {
+    tokens: std.ArrayList(Token),
+    lines: std.ArrayList(u32),
+
+    pub fn init(allocator: std.mem.Allocator) TokenResult {
+        return .{
+            .tokens = std.ArrayList(Token).init(allocator),
+            .lines = std.ArrayList(u32).init(allocator),
+        };
+    }
+    // pub fn initBetter(allocator: std.mem.Allocator, input_size: usize) !TokenResult {
+    //     // TODO: determine actual relationship between input size and token count
+    //     return .{
+    //         .tokens = try std.ArrayList(Token).initCapacity(allocator, input_size / 12),
+    //         .lines = try std.ArrayList(u32).initCapacity(allocator, input_size / 64),
+    //     };
+    // }
+
+    pub fn deinit(self: *TokenResult) void {
+        self.tokens.deinit();
+        self.lines.deinit();
+    }
+};
 
 /// For debugging purposes.
 pub fn dump(self: *Tokenizer, token: *const Token) void {
@@ -60,12 +82,23 @@ pub fn init(buffer: [:0]const u8) Tokenizer {
 
 pub fn tokenize(self: *Tokenizer, allocator: std.mem.Allocator) !TokenResult {
     var result = TokenResult.init(allocator);
+    try result.lines.append(0);
 
     var eof = false;
     while (!eof) {
         const token = self.next();
-        try result.append(token);
-        eof = token.tag == .eof;
+        switch (token.tag) {
+            .newline => {
+                try result.lines.append(@intCast(token.loc.end));
+            },
+            .eof => {
+                eof = true;
+                try result.tokens.append(token);
+            },
+            else => {
+                try result.tokens.append(token);
+            },
+        }
     }
     return result;
 }

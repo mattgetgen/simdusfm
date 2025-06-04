@@ -9,7 +9,7 @@ const print = std.debug.print;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const source = @embedFile("usfm/HPUX.usfm");
-var fixed_buffer_mem: [20 * 1024 * 1024]u8 = undefined;
+var fixed_buffer_mem: [40 * 1024 * 1024]u8 = undefined;
 
 const TestResult = struct {
     memory_usage: usize,
@@ -58,7 +58,7 @@ fn testOnce3() !TestResult {
     var tokenizer = Tokenizer.init(source);
     const tokens = try tokenizer.tokenize(allocator);
 
-    result.token_count = tokens.items.len;
+    result.token_count = tokens.tokens.items.len;
     result.memory_usage = fixed_buffer_alloc.end_index;
     return result;
 }
