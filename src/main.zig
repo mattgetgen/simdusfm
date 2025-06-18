@@ -8,11 +8,6 @@ const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 const dirpath = "/home/mgetgen/repos/example_usfm/HPUX/";
 
 pub fn main() !void {
-    try run_std_test();
-    // try testByIterations();
-}
-
-fn run_std_test() !void {
     var dbg = std.heap.DebugAllocator(.{}){};
     defer _ = dbg.deinit();
     _ = dbg.detectLeaks();
@@ -20,9 +15,15 @@ fn run_std_test() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer _ = arena.deinit();
 
-    const allocator = dbg.allocator();
-    // const allocator = arena.allocator();
+    const dbg_alloc = dbg.allocator();
+    const arena_alloc = arena.allocator();
+    try run_std_test(dbg_alloc);
+    try run_std_test(arena_alloc);
 
+    // try testByIterations();
+}
+
+fn run_std_test(allocator: std.mem.Allocator) !void {
     var dir = try std.fs.openDirAbsolute(dirpath, .{
         .access_sub_paths = false,
         .iterate = true,
@@ -34,6 +35,8 @@ fn run_std_test() !void {
 
     var total_size: usize = 0;
     var total_tokens: usize = 0;
+    var total_lines: usize = 0;
+    var total_tokens_fast: usize = 0;
 
     var it = dir.iterate();
     while (try it.next()) |entry| {
@@ -56,6 +59,9 @@ fn run_std_test() !void {
         // break;
     }
 
+    // for (file_bytes.items) |data| {
+    //     _ = try Parser.parse(allocator, data);
+    // }
     var timer = try std.time.Timer.start();
 
     const noop_start = timer.lap();
@@ -70,18 +76,40 @@ fn run_std_test() !void {
 
     const start = timer.lap();
     for (file_bytes.items) |bytes| {
-        defer allocator.free(bytes);
+        var tokenizer = Tokenizer.init(bytes);
 
-        total_tokens += try Parser.parse(allocator, bytes);
+        var token_result = try tokenizer.tokenize(allocator);
+        defer token_result.deinit();
+
+        total_tokens += token_result.tokens.items.len;
+        total_lines += token_result.lines.items.len;
     }
+    const end = timer.lap();
 
-    const end = timer.read();
+    const fast_start = timer.lap();
+    for (file_bytes.items) |bytes| {
+        var tokenizer = Tokenizer.init(bytes);
+
+        var token_result = try tokenizer.tokenizeFast(allocator);
+        defer token_result.deinit();
+
+        total_tokens_fast += token_result.tokens.items.len;
+    }
+    const fast_end = timer.read();
+
     const noop_bps = calc_bps(noop_start, noop_end, total_size);
     const bps = calc_bps(start, end, total_size);
+    const fast_bps = calc_bps(fast_start, fast_end, total_size);
 
     std.debug.print("tokenized {:.2} into {d} tokens\n", .{ fmtIntSizeBin(total_size), total_tokens });
+    std.debug.print("bytes/token: {d}\n", .{total_size / total_tokens});
+    std.debug.print("bytes/lines: {d}\n", .{total_size / total_lines});
     std.debug.print("noop speed: {:.2}/s\n", .{fmtIntSizeBin(noop_bps)});
     std.debug.print("parsing speed: {:.2}/s\n", .{fmtIntSizeBin(bps)});
+    std.debug.print("faster parsing speed: {:.2}/s\n\n", .{fmtIntSizeBin(fast_bps)});
+    for (file_bytes.items) |bytes| {
+        defer allocator.free(bytes);
+    }
 }
 
 fn calc_bps(start: u64, end: u64, total_size: usize) u64 {

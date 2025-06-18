@@ -9,7 +9,7 @@ const print = std.debug.print;
 const fmtIntSizeBin = std.fmt.fmtIntSizeBin;
 
 const source = @embedFile("usfm/HPUX.usfm");
-var fixed_buffer_mem: [40 * 1024 * 1024]u8 = undefined;
+var fixed_buffer_mem: [128 * 1024 * 1024]u8 = undefined;
 
 const TestResult = struct {
     memory_usage: usize,
@@ -20,11 +20,12 @@ const TestResult = struct {
     const TokenizerType = enum {
         First,
         Dumb,
-        Final,
+        Best,
+        Best2,
     };
 };
 
-fn testOnce1() !TestResult {
+fn test_once_first() !TestResult {
     var result: TestResult = undefined;
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
@@ -37,7 +38,7 @@ fn testOnce1() !TestResult {
     return result;
 }
 
-fn testOnce2() !TestResult {
+fn test_once_dumb() !TestResult {
     var result: TestResult = undefined;
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
@@ -50,13 +51,26 @@ fn testOnce2() !TestResult {
     return result;
 }
 
-fn testOnce3() !TestResult {
+fn test_once_best() !TestResult {
     var result: TestResult = undefined;
     var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
     const allocator = fixed_buffer_alloc.allocator();
 
     var tokenizer = Tokenizer.init(source);
     const tokens = try tokenizer.tokenize(allocator);
+
+    result.token_count = tokens.tokens.items.len;
+    result.memory_usage = fixed_buffer_alloc.end_index;
+    return result;
+}
+
+fn test_once_best2() !TestResult {
+    var result: TestResult = undefined;
+    var fixed_buffer_alloc = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
+    const allocator = fixed_buffer_alloc.allocator();
+
+    var tokenizer = Tokenizer.init(source);
+    const tokens = try tokenizer.tokenizeFast(allocator);
 
     result.token_count = tokens.tokens.items.len;
     result.memory_usage = fixed_buffer_alloc.end_index;
@@ -80,7 +94,7 @@ pub fn testByIterations() !void {
         var timer = try std.time.Timer.start();
         const start = timer.lap();
         while (i < iterations) : (i += 1) {
-            const result = try testOnce1();
+            const result = try test_once_first();
             test_result.memory_usage += result.memory_usage;
             test_result.token_count += result.token_count;
         }
@@ -103,7 +117,7 @@ pub fn testByIterations() !void {
         var timer = try std.time.Timer.start();
         const start = timer.lap();
         while (i < iterations) : (i += 1) {
-            const result = try testOnce2();
+            const result = try test_once_dumb();
             test_result.memory_usage += result.memory_usage;
             test_result.token_count += result.token_count;
         }
@@ -118,7 +132,7 @@ pub fn testByIterations() !void {
         .memory_usage = 0,
         .token_count = 0,
         .iterations = 0,
-        .type = .Final,
+        .type = .Best,
     };
     for (iteration_list) |iterations| {
         test_result.iterations = iterations;
@@ -126,7 +140,30 @@ pub fn testByIterations() !void {
         var timer = try std.time.Timer.start();
         const start = timer.lap();
         while (i < iterations) : (i += 1) {
-            const result = try testOnce3();
+            const result = try test_once_best();
+            test_result.memory_usage += result.memory_usage;
+            test_result.token_count += result.token_count;
+        }
+        const end = timer.read();
+
+        print_result(test_result, start, end);
+        test_result.memory_usage = 0;
+        test_result.token_count = 0;
+    }
+
+    test_result = .{
+        .memory_usage = 0,
+        .token_count = 0,
+        .iterations = 0,
+        .type = .Best2,
+    };
+    for (iteration_list) |iterations| {
+        test_result.iterations = iterations;
+        var i: usize = 0;
+        var timer = try std.time.Timer.start();
+        const start = timer.lap();
+        while (i < iterations) : (i += 1) {
+            const result = try test_once_best2();
             test_result.memory_usage += result.memory_usage;
             test_result.token_count += result.token_count;
         }

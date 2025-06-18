@@ -39,27 +39,49 @@ pub const Token = struct {
         marker_invalid,
         marker_text,
         marker_suffix,
+        marker_uppercase_text,
         marker_z_text,
     };
 };
 
+pub const RowCol = struct {
+    row: usize,
+    col: usize,
+};
+
 pub const TokenResult = struct {
     tokens: std.ArrayList(Token),
-    lines: std.ArrayList(u32),
+    lines: std.ArrayList(usize),
 
     pub fn init(allocator: std.mem.Allocator) TokenResult {
         return .{
             .tokens = std.ArrayList(Token).init(allocator),
-            .lines = std.ArrayList(u32).init(allocator),
+            .lines = std.ArrayList(usize).init(allocator),
         };
     }
-    // pub fn initBetter(allocator: std.mem.Allocator, input_size: usize) !TokenResult {
-    //     // TODO: determine actual relationship between input size and token count
-    //     return .{
-    //         .tokens = try std.ArrayList(Token).initCapacity(allocator, input_size / 12),
-    //         .lines = try std.ArrayList(u32).initCapacity(allocator, input_size / 64),
-    //     };
-    // }
+    pub fn initFast(allocator: std.mem.Allocator, input_size: usize) !TokenResult {
+        // TODO: determine actual relationship between input size and token count
+        return .{
+            .tokens = try std.ArrayList(Token).initCapacity(allocator, input_size / 12),
+            .lines = try std.ArrayList(usize).initCapacity(allocator, input_size / 64),
+        };
+    }
+
+    pub fn get_row_col(self: *TokenResult, start: usize) RowCol {
+        // row/col is a 1-based value
+        var result: RowCol = .{
+            .row = 1,
+            .col = 1,
+        };
+        for (self.lines.items, 1..) |line, i| {
+            if (line > start) {
+                break;
+            }
+            result.row = i;
+            result.col = start - line + 1;
+        }
+        return result;
+    }
 
     pub fn deinit(self: *TokenResult) void {
         self.tokens.deinit();
@@ -89,7 +111,29 @@ pub fn tokenize(self: *Tokenizer, allocator: std.mem.Allocator) !TokenResult {
         const token = self.next();
         switch (token.tag) {
             .newline => {
-                try result.lines.append(@intCast(token.loc.end));
+                try result.lines.append(token.loc.end);
+            },
+            .eof => {
+                eof = true;
+                try result.tokens.append(token);
+            },
+            else => {
+                try result.tokens.append(token);
+            },
+        }
+    }
+    return result;
+}
+pub fn tokenizeFast(self: *Tokenizer, allocator: std.mem.Allocator) !TokenResult {
+    var result = try TokenResult.initFast(allocator, self.buffer.len);
+    try result.lines.append(0);
+
+    var eof = false;
+    while (!eof) {
+        const token = self.next();
+        switch (token.tag) {
+            .newline => {
+                try result.lines.append(token.loc.end);
             },
             .eof => {
                 eof = true;
@@ -210,7 +254,7 @@ fn next(self: *Tokenizer) Token {
             '0'...'9' => {
                 result.tag = .number;
                 self.index += 1;
-                continue :state .search_until_not_text;
+                continue :state .search_until_not_number;
             },
             '#' => {
                 result.tag = .comment;
@@ -249,8 +293,15 @@ fn next(self: *Tokenizer) Token {
         .marker_first => {
             self.state = .start;
             switch (self.buffer[self.index]) {
-                'a'...'y', 'A'...'Z' => {
+                'a'...'y' => {
                     result.tag = .marker_text;
+                    self.index += 1;
+                    continue :state .marker_capture_text;
+                },
+                // Any token stat starts with an uppercase character are
+                // for stylesheets, and aren't apart of USFM.
+                'A'...'Z' => {
+                    result.tag = .marker_uppercase_text;
                     self.index += 1;
                     continue :state .marker_capture_text;
                 },
